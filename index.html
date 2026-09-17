@@ -333,6 +333,7 @@
     font-size:12px; font-weight:600; letter-spacing:.08em;
   }
   .chip[aria-pressed="true"]{background:hsl(var(--h) 85% 72% / .42); border-color:rgba(255,255,255,.7);}
+  .chip.has-game::after{content:" •"; color:hsl(var(--h) 100% 88%);}
   .swatches{display:flex; gap:10px;}
   .sw{flex:1; height:44px; border-radius:14px; padding:0; border:2px solid transparent;}
   .sw[aria-pressed="true"]{border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.22), var(--shadow);}
@@ -477,6 +478,7 @@
     </div>
     <p id="modeHelp"></p>
     <button class="close" id="startMode" type="button">START</button>
+    <button class="close" id="freshStart" type="button" style="margin-top:8px; display:none">NEW GAME</button>
     <button class="close" id="closeModes" type="button" style="margin-top:8px">CANCEL</button>
   </div>
 </div>
@@ -545,7 +547,9 @@
 (function(){
   "use strict";
 
-  const KEY   = "game2048.state";
+  const KEY   = "game2048.state";     // legacy single-slot save, migrated on first run
+  const GAMES = "game2048.games";     // one saved game per mode+size
+  const LAST  = "game2048.last";
   const BEST  = "game2048.best";      // { "classic:4": 1234, ... }
   const PREFS = "game2048.prefs";
   const STATS = "game2048.stats";
@@ -573,6 +577,7 @@
                                tutorialDone:false, theme:"teal", size:4, mode:"classic"},
                               store.json(PREFS, {}));
   let bestMap = store.json(BEST, {});
+  let games   = store.json(GAMES, {});
   let stats   = Object.assign({games:0, moves:0, bestTile:0, totalScore:0, medals:[]}, store.json(STATS, {}));
   let top     = store.json(TOP, []);
 
@@ -583,7 +588,7 @@
 
   // --- game state -----------------------------------------------------------
   const S = {size:4, mode:"classic", grid:null, score:0, won:false, over:false,
-             uid:0, draws:0, history:[], timeLeft:TIMED_SECONDS, ended:false};
+             uid:0, draws:0, moves:0, history:[], timeLeft:TIMED_SECONDS, ended:false};
   let wonDismissed = false, vanishing = [], rngFn = Math.random, timer = null;
 
   const bestKey = () => S.mode + ":" + S.size;
@@ -728,32 +733,85 @@
   function snapshot(){
     return JSON.stringify({
       grid: S.grid.map(row => row.map(t => t ? {id:t.id, value:t.value, r:t.r, c:t.c} : null)),
-      score:S.score, won:S.won, over:S.over, uid:S.uid, draws:S.draws, timeLeft:S.timeLeft
+      score:S.score, won:S.won, over:S.over, uid:S.uid, draws:S.draws, moves:S.moves, timeLeft:S.timeLeft
     });
   }
   function restore(snap){
     const s = JSON.parse(snap);
     S.grid = s.grid.map(row => row.map(t => t ? {...t, isNew:false, merged:false} : null));
     S.score = s.score; S.won = s.won; S.over = s.over; S.uid = s.uid;
-    S.draws = s.draws || 0;
+    S.draws = s.draws || 0; S.moves = s.moves || 0;
     S.timeLeft = (typeof s.timeLeft === "number") ? s.timeLeft : TIMED_SECONDS;
     rebuildRng();
   }
 
+  const saveGames = () => store.set(GAMES, JSON.stringify(games));
+
+  /** Each mode and board size keeps its own game, so switching never destroys one. */
   function save(){
-    store.set(KEY, JSON.stringify({
-      size:S.size, mode:S.mode, ended:S.ended, snap:snapshot(), history:S.history.slice(-20)
-    }));
+    games[bestKey()] = {
+      size:S.size, mode:S.mode, ended:S.ended,
+      day: S.mode === "daily" ? todayKey() : 0,
+      score:S.score, moves:S.moves, snap:snapshot(), history:S.history.slice(-20)
+    };
+    saveGames();
+    store.set(LAST, bestKey());
   }
-  function load(){
-    const data = store.json(KEY, null);
-    if (!data || !data.snap) return false;
+
+  /** A slot worth resuming: unfinished, and for the daily challenge, from today. */
+  function slotInProgress(key){
+    const d = games[key];
+    if (!d || !d.snap || d.ended) return null;
+    if (!(d.moves > 0 || d.score > 0)) return null;      // a fresh, untouched board is not "in progress"
+    if (d.mode === "daily" && d.day !== todayKey()) return null;
+    return d;
+  }
+
+  function loadSlot(key){
+    const d = games[key];
+    if (!d || !d.snap) return false;
+    if (d.mode === "daily" && d.day !== todayKey()){ delete games[key]; saveGames(); return false; }
     try {
-      S.size = data.size || 4; S.mode = data.mode || "classic"; S.ended = !!data.ended;
-      restore(data.snap);
-      S.history = Array.isArray(data.history) ? data.history : [];
+      S.size = d.size || 4; S.mode = d.mode || "classic"; S.ended = !!d.ended;
+      restore(d.snap);
+      S.history = Array.isArray(d.history) ? d.history : [];
       return true;
     } catch(e){ return false; }
+  }
+
+  /** Move a pre-1.4 single-slot save into its matching slot. */
+  function migrateLegacySave(){
+    const old = store.json(KEY, null);
+    if (!old || !old.snap) return;
+    const key = (old.mode || "classic") + ":" + (old.size || 4);
+    if (!games[key]){
+      let carried = {score:0, moves:0};
+      try { const inner = JSON.parse(old.snap); carried = {score:inner.score || 0, moves:inner.moves || 0}; } catch(e){}
+      games[key] = {size:old.size || 4, mode:old.mode || "classic", ended:!!old.ended,
+                    day: old.mode === "daily" ? todayKey() : 0,
+                    score:carried.score, moves:carried.moves || (carried.score ? 1 : 0),
+                    snap:old.snap, history:old.history || []};
+      saveGames();
+    }
+    if (!store.get(LAST)) store.set(LAST, key);
+    store.del(KEY);
+  }
+
+  function load(){
+    migrateLegacySave();
+    const last = store.get(LAST);
+    return !!(last && loadSlot(last));
+  }
+
+  /** Reopen a saved game, or start a fresh one if that slot is empty. */
+  function openSlot(key, size, mode){
+    stopTimer(); resetNodes();
+    if (!loadSlot(key)){ newGame(size, mode); return; }
+    prefs.size = S.size; prefs.mode = S.mode; savePrefs();
+    store.set(LAST, key);
+    wonDismissed = S.won;
+    buildGrid(); hideOverlay(); render();
+    if (S.mode === "timed" && !S.over && S.timeLeft > 0) startTimer();
   }
 
   function newGame(size, mode){
@@ -763,7 +821,7 @@
     resetNodes();
     S.grid = emptyGrid(S.size);
     S.score = 0; S.won = false; S.over = false; S.ended = false;
-    S.uid = 0; S.draws = 0; S.history = []; S.timeLeft = TIMED_SECONDS;
+    S.uid = 0; S.draws = 0; S.moves = 0; S.history = []; S.timeLeft = TIMED_SECONDS;
     wonDismissed = false;
     rebuildRng();
     addRandomTile(); addRandomTile();
@@ -831,6 +889,7 @@
     }
     addRandomTile();
 
+    S.moves++;
     stats.moves++;
     const top4 = maxTile();
     if (top4 > stats.bestTile) stats.bestTile = top4;
@@ -1248,10 +1307,16 @@
 
   function paintMenuNote(){
     const daily = store.json(DAILY, null);
-    const parts = [MODE_NAMES[prefs.mode] + " " + prefs.size + "×" + prefs.size];
-    if (getBest()) parts.push("BEST " + getBest());
+    const current = slotInProgress(bestKey());
+    const parts = [MODE_NAMES[S.mode] + " " + S.size + "×" + S.size];
+    if (current) parts.push("IN PROGRESS " + (current.score || 0));
+    else if (getBest()) parts.push("BEST " + getBest());
     if (daily && daily.day === todayKey()) parts.push("TODAY " + daily.score);
     $("menuNote").textContent = parts.join("  ·  ");
+    $("play").textContent = current ? "CONTINUE" : "PLAY";
+
+    const others = Object.keys(games).filter(k => k !== bestKey() && slotInProgress(k)).length;
+    $("openModes").textContent = others ? "MODES (" + others + " SAVED)" : "MODES";
   }
 
   // --- theme ----------------------------------------------------------------
@@ -1299,11 +1364,21 @@
   };
 
   function paintModes(){
-    document.querySelectorAll("#sizeChips .chip").forEach(b =>
-      b.setAttribute("aria-pressed", +b.dataset.size === pickSize ? "true" : "false"));
-    document.querySelectorAll("#modeChips .chip").forEach(b =>
-      b.setAttribute("aria-pressed", b.dataset.mode === pickMode ? "true" : "false"));
-    $("modeHelp").textContent = MODE_HELP[pickMode];
+    document.querySelectorAll("#sizeChips .chip").forEach(b => {
+      b.setAttribute("aria-pressed", +b.dataset.size === pickSize ? "true" : "false");
+      b.classList.toggle("has-game", !!slotInProgress(pickMode + ":" + b.dataset.size));
+    });
+    document.querySelectorAll("#modeChips .chip").forEach(b => {
+      b.setAttribute("aria-pressed", b.dataset.mode === pickMode ? "true" : "false");
+      b.classList.toggle("has-game", !!slotInProgress(b.dataset.mode + ":" + pickSize));
+    });
+
+    const saved = slotInProgress(pickMode + ":" + pickSize);
+    $("startMode").textContent = saved ? "RESUME" : "START";
+    $("freshStart").style.display = saved ? "" : "none";
+    $("modeHelp").textContent = saved
+      ? MODE_HELP[pickMode] + "  ·  In progress: " + (saved.score || 0)
+      : MODE_HELP[pickMode];
   }
 
   // --- input ----------------------------------------------------------------
@@ -1357,16 +1432,20 @@
     pickSize = prefs.size; pickMode = prefs.mode; paintModes(); openSheet("modesSheet");
   });
   $("closeModes").addEventListener("click", () => closeSheet("modesSheet"));
-  $("startMode").addEventListener("click", () => {
+  function enterGame(fresh){
+    const key = pickMode + ":" + pickSize;
     closeSheet("modesSheet");
-    if (pickMode === "daily"){
+    if (pickMode === "daily" && fresh){
       const done = store.json(DAILY, null);
       if (done && done.day === todayKey()) toast("Today's score: " + done.score + " — replaying");
     }
-    newGame(pickSize, pickMode);
+    if (fresh) newGame(pickSize, pickMode);
+    else openSlot(key, pickSize, pickMode);
     showScreen("game");
     if (!prefs.tutorialDone) showTutorial();
-  });
+  }
+  $("startMode").addEventListener("click", () => enterGame(!slotInProgress(pickMode + ":" + pickSize)));
+  $("freshStart").addEventListener("click", () => enterGame(true));
   document.querySelectorAll("#sizeChips .chip").forEach(b =>
     b.addEventListener("click", () => { pickSize = +b.dataset.size; paintModes(); sfx.tap(); }));
   document.querySelectorAll("#modeChips .chip").forEach(b =>
@@ -1420,7 +1499,9 @@
 
   $("resetAll").addEventListener("click", () => {
     bestMap = {}; stats = {games:0, moves:0, bestTile:0, totalScore:0, medals:[]}; top = [];
+    games = {}; saveGames(); store.del(LAST);
     saveBest(); saveStats(); saveTop(); store.del(DAILY);
+    newGame(S.size, S.mode);
     render(); paintStats(); paintMenuNote(); sfx.tap(); toast("Scores and stats cleared");
   });
 
