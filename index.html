@@ -25,8 +25,9 @@
     --glass:rgba(255,255,255,.16);
     --glass-strong:rgba(255,255,255,.24);
     --edge:rgba(255,255,255,.38);
-    --gap:2.3vw;
-    --radius:4.2vw;
+    --gap:9px;           /* recomputed from the board's real width on every resize */
+    --radius:16px;
+    --tile-font:28px;
     --shadow:0 10px 24px rgba(0,0,0,.18);
     --inner:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -1px 0 rgba(255,255,255,.12);
     --n:4;
@@ -72,6 +73,26 @@
 
   .screen{width:100%; max-width:min(92vw,440px); display:none; flex-direction:column; align-items:center; position:relative; z-index:1;}
   .screen.active{display:flex;}
+  .side{width:100%; display:flex; flex-direction:column; align-items:center;}
+
+  /* Tablets: a little more room, but never a board wider than it is tall. */
+  @media (min-width:700px){
+    .screen{max-width:min(80vw,560px);}
+  }
+
+  /* Landscape: the board sits beside the panel instead of under it. */
+  @media (orientation:landscape) and (min-aspect-ratio:1/1){
+    body{padding-top:max(10px,env(safe-area-inset-top)); padding-bottom:max(10px,env(safe-area-inset-bottom));}
+    #game{flex-direction:row; align-items:center; justify-content:center; gap:min(4vw,28px);
+          max-width:min(96vw,980px);}
+    #game .side{flex:1 1 44%; max-width:420px;}
+    #game .board{flex:0 0 auto; width:min(82vh,460px); margin-top:0;}
+    #game h1{font-size:clamp(26px,6vh,44px);}
+    #menu .menu-actions{margin-top:4vh; width:min(70vw,420px);}
+    #menu .icon-row{margin-top:4vh;}
+    #menu h1{font-size:clamp(34px,11vh,64px);}
+    .card{max-height:92vh;}
+  }
 
   h1{
     margin:0; font-size:clamp(40px,13vw,74px); font-weight:800; letter-spacing:.02em;
@@ -160,18 +181,13 @@
     height:calc((100% - (var(--n) - 1) * var(--gap)) / var(--n));
     display:flex; align-items:center; justify-content:center;
     border-radius:var(--radius); font-weight:700;
+    font-size:var(--tile-font);
     color:hsl(var(--h) 100% 96%); text-shadow:0 1px 6px rgba(0,0,0,.28);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 4px 12px rgba(0,0,0,.16);
     transition:transform .1s ease-in-out; will-change:transform;
   }
-  .tiles[data-n="3"] .tile{font-size:clamp(28px,10vw,52px);}
-  .tiles[data-n="4"] .tile{font-size:clamp(22px,8vw,40px);}
-  .tiles[data-n="5"] .tile{font-size:clamp(17px,6.2vw,31px);}
-  .tiles[data-n="6"] .tile{font-size:clamp(14px,5vw,26px);}
-  .tiles[data-n="3"] .tile.long{font-size:clamp(21px,7.4vw,38px);}
-  .tiles[data-n="4"] .tile.long{font-size:clamp(16px,5.8vw,29px);}
-  .tiles[data-n="5"] .tile.long{font-size:clamp(13px,4.6vw,23px);}
-  .tiles[data-n="6"] .tile.long{font-size:clamp(11px,3.8vw,19px);}
+  .tile{font-size:var(--tile-font);}
+  .tile.long{font-size:calc(var(--tile-font) * .72);}
   .tile.new{animation:pop .16s ease-in-out;}
   .tile.merged{animation:bump .18s ease-in-out;}
   @keyframes pop{from{transform:var(--pos) scale(.2);}to{transform:var(--pos) scale(1);}}
@@ -220,7 +236,57 @@
   @keyframes hintPulse{0%{opacity:0; transform:scale(.7);} 25%{opacity:1; transform:scale(1);}
                        75%{opacity:1;} 100%{opacity:0; transform:scale(1.05);}}
 
+  /* first-run tutorial */
+  .tutorial{
+    position:absolute; inset:0; z-index:7; border-radius:calc(var(--radius) + 6px);
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:hsl(var(--h2) 60% 16% / .66); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px);
+    text-align:center; padding:18px; cursor:pointer;
+  }
+  .tutorial.show{display:flex;}
+  .tut-text{margin:0; font-size:clamp(13px,4.2vw,17px); font-weight:700; letter-spacing:.14em;}
+  .tut-hint{margin:0; font-size:11px; letter-spacing:.2em; color:var(--ink-dim);}
+  .hand{
+    width:56px; height:56px; border-radius:50%;
+    background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.95), rgba(255,255,255,.35) 60%, rgba(255,255,255,.12) 72%);
+    box-shadow:0 0 22px hsl(var(--h) 100% 80% / .7);
+    animation:swipeHand 2.4s ease-in-out infinite;
+  }
+  @keyframes swipeHand{
+    0%   {transform:translateX(-64px) scale(.75); opacity:0;}
+    18%  {transform:translateX(-64px) scale(1);   opacity:1;}
+    62%  {transform:translateX(64px)  scale(1);   opacity:1;}
+    80%  {transform:translateX(64px)  scale(.75); opacity:0;}
+    100% {transform:translateX(-64px) scale(.75); opacity:0;}
+  }
+
+  /* accessibility */
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+  }
+  :focus-visible{outline:3px solid #fff; outline-offset:3px;}
+
+  /* high contrast: solid surfaces, hard edges, no blur */
+  .hc .glass, .hc button{
+    background:hsl(var(--h2) 70% 12%); border-color:#fff; border-width:2px;
+    -webkit-backdrop-filter:none; backdrop-filter:none; box-shadow:none; color:#fff;
+  }
+  .hc .grid div{background:hsl(var(--h2) 60% 20%); box-shadow:none;}
+  .hc .tile{color:#fff; text-shadow:none; box-shadow:inset 0 0 0 2px rgba(255,255,255,.85);}
+  .hc .t2{background:hsl(var(--h) 45% 34%);} .hc .t4{background:hsl(var(--h) 50% 40%);}
+  .hc .t8{background:hsl(var(--h) 60% 46%);} .hc .t16{background:hsl(var(--h) 70% 38%);}
+  .hc .t32{background:hsl(var(--h) 75% 32%);} .hc .t64{background:hsl(var(--h) 80% 26%);}
+  .hc .t128{background:hsl(var(--h) 85% 22%);} .hc .t256{background:hsl(var(--h) 85% 19%);}
+  .hc .t512{background:hsl(var(--h) 88% 16%);} .hc .t1024{background:hsl(var(--h) 90% 13%);}
+  .hc .t2048{background:#000;} .hc .tbig{background:#000; color:hsl(var(--h) 100% 80%);}
+  .hc .label, .hc .meta, .hc .cap, .hc .tut-hint{color:#fff;}
+  .hc #bubbles{display:none;}
+  .hc .overlay, .hc .sheet, .hc .tutorial{background:hsl(var(--h2) 70% 8% / .95);
+    -webkit-backdrop-filter:none; backdrop-filter:none;}
+
   @media (prefers-reduced-motion: reduce){ .tile{transition:none;} .tile.new,.tile.merged{animation:none;} }
+  .no-anim .hand{animation:none;}
   .no-anim .tile{transition:none !important;}
   .no-anim .tile.new, .no-anim .tile.merged, .no-anim .spark, .no-anim .flash, .no-anim .gain{animation:none !important;}
   .no-anim .spark, .no-anim .flash{display:none;}
@@ -343,11 +409,14 @@
 
 <!-- ------------------------------- GAME ------------------------------- -->
 <section class="screen" id="game">
+ <div class="side">
   <h1>2048</h1>
 
   <div class="panels">
-    <div class="panel glass"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
-    <div class="panel glass"><span class="label" id="bestLabel">BEST</span><span class="value" id="best">0</span></div>
+    <div class="panel glass"><span class="label" id="scoreLabel">SCORE</span>
+      <span class="value" id="score" aria-labelledby="scoreLabel">0</span></div>
+    <div class="panel glass"><span class="label" id="bestLabel">BEST</span>
+      <span class="value" id="best" aria-labelledby="bestLabel">0</span></div>
   </div>
 
   <div class="meta"><span id="modeChip">CLASSIC 4×4</span><span id="progressText">0 / 2048</span></div>
@@ -358,11 +427,19 @@
     <button class="ctrl" id="hint" type="button">HINT</button>
     <button class="ctrl" id="restart" type="button">NEW</button>
   </div>
+ </div>
 
-  <div class="board glass" id="board">
-    <div class="grid" id="grid"></div>
+  <div class="board glass" id="board" role="application"
+       aria-label="Game board. Swipe, or use the arrow keys, to move the tiles.">
+    <div class="grid" id="grid" aria-hidden="true"></div>
     <div class="tiles" id="tiles" data-n="4"></div>
-    <div id="hintArrow"><svg viewBox="0 0 24 24"><path d="M12 3l8 9h-5v9h-6v-9H4z"/></svg></div>
+    <div id="hintArrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l8 9h-5v9h-6v-9H4z"/></svg></div>
+
+    <div class="tutorial" id="tutorial" aria-hidden="true">
+      <p class="tut-text">SWIPE TO MOVE THE TILES</p>
+      <div class="hand"></div>
+      <p class="tut-hint">TAP TO START</p>
+    </div>
     <div class="overlay" id="overlay">
       <div class="msg" id="overlayMsg"></div>
       <div class="sub" id="overlaySub"></div>
@@ -420,6 +497,10 @@
     <div class="opt"><span>Sound</span><button class="switch" id="swSound" role="switch" aria-checked="true"></button></div>
     <div class="opt"><span>Vibration</span><button class="switch" id="swVibe" role="switch" aria-checked="true"></button></div>
     <div class="opt"><span>Animations</span><button class="switch" id="swAnim" role="switch" aria-checked="true"></button></div>
+    <div class="opt"><span>Ambient sound</span><button class="switch" id="swAmbient" role="switch" aria-checked="true"></button></div>
+    <div class="opt"><span>High contrast</span><button class="switch" id="swContrast" role="switch" aria-checked="false"></button></div>
+    <div class="opt"><span>Tutorial</span>
+      <button class="chip" id="replayTutorial" type="button" style="flex:0 0 auto">SHOW</button></div>
     <div class="opt"><span>Reset scores &amp; stats</span>
       <button class="chip" id="resetAll" type="button" style="flex:0 0 auto">RESET</button></div>
     <button class="close" id="closeSettings" type="button">DONE</button>
@@ -452,7 +533,8 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
+<p id="a11yStatus" class="sr-only" aria-live="polite"></p>
 <style>
   .burst{position:absolute; pointer-events:none; z-index:3;
     width:calc((100% - (var(--n) - 1) * var(--gap)) / var(--n));
@@ -487,7 +569,8 @@
   const elTiles = $("tiles"), elBoard = $("board"), elGrid = $("grid");
 
   // --- persisted collections -----------------------------------------------
-  const prefs = Object.assign({sound:true, vibe:true, anim:true, theme:"teal", size:4, mode:"classic"},
+  const prefs = Object.assign({sound:true, vibe:true, anim:true, ambient:true, contrast:false,
+                               tutorialDone:false, theme:"teal", size:4, mode:"classic"},
                               store.json(PREFS, {}));
   let bestMap = store.json(BEST, {});
   let stats   = Object.assign({games:0, moves:0, bestTile:0, totalScore:0, medals:[]}, store.json(STATS, {}));
@@ -555,6 +638,67 @@
     lose(){ beep(220, 320, .08); }
   };
   function buzz(p){ if (prefs.vibe && navigator.vibrate) { try { navigator.vibrate(p); } catch(e){} } }
+
+  /** Merging 512 should land harder than merging 4. */
+  function buzzMerge(value){
+    const steps = Math.max(1, Math.log2(value) - 1);        // 4 -> 1, 512 -> 8
+    if (value >= 512) return buzz([0, 26, 26, Math.min(20 + steps * 9, 90)]);
+    buzz(Math.round(Math.min(6 + steps * 5, 46)));
+  }
+
+  /**
+   * A quiet ambient pad, generated rather than shipped: three detuned voices through a
+   * low-pass filter, breathing on a slow LFO. Browsers only allow it after a gesture.
+   */
+  const ambient = {
+    nodes:null,
+    start(){
+      if (!prefs.ambient || this.nodes) return;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audio = audio || new Ctx();
+        if (audio.state === "suspended") audio.resume();
+        const master = audio.createGain();
+        master.gain.value = 0;
+        const filter = audio.createBiquadFilter();
+        filter.type = "lowpass"; filter.frequency.value = 520; filter.Q.value = .6;
+        filter.connect(master).connect(audio.destination);
+
+        const voices = [110, 164.81, 220].map((freq, i) => {
+          const osc = audio.createOscillator();
+          osc.type = i === 2 ? "sine" : "triangle";
+          osc.frequency.value = freq;
+          osc.detune.value = (i - 1) * 6;
+          const gain = audio.createGain();
+          gain.gain.value = i === 2 ? .18 : .32;
+          osc.connect(gain).connect(filter);
+          osc.start();
+          return osc;
+        });
+
+        const lfo = audio.createOscillator(), lfoGain = audio.createGain();
+        lfo.frequency.value = 0.05; lfoGain.gain.value = .012;
+        lfo.connect(lfoGain).connect(master.gain);
+        lfo.start();
+
+        master.gain.setValueAtTime(0, audio.currentTime);
+        master.gain.linearRampToValueAtTime(.03, audio.currentTime + 4);   // fade in slowly
+        this.nodes = {master, voices, lfo};
+      } catch(e){}
+    },
+    stop(){
+      if (!this.nodes) return;
+      const {master, voices, lfo} = this.nodes;
+      this.nodes = null;
+      try {
+        master.gain.cancelScheduledValues(audio.currentTime);
+        master.gain.setValueAtTime(master.gain.value, audio.currentTime);
+        master.gain.linearRampToValueAtTime(0, audio.currentTime + .6);
+        setTimeout(() => { voices.forEach(v => { try { v.stop(); } catch(e){} }); try { lfo.stop(); } catch(e){} }, 800);
+      } catch(e){}
+    }
+  };
 
   // --- model ----------------------------------------------------------------
   const emptyGrid = n => Array.from({length:n}, () => Array.from({length:n}, () => null));
@@ -696,7 +840,7 @@
     render(); save();
 
     if (gained){
-      sfx.merge(biggest); buzz(10);
+      sfx.merge(biggest); buzzMerge(biggest);
       showGain(gained);
       for (const m of merges){ burst(m.r, m.c); flash(m.r, m.c); }
       checkMedal(biggest);
@@ -792,11 +936,23 @@
     nodes.clear();
   }
 
+  /** Gaps and type scale with the board's real size, so landscape and tablets stay correct. */
+  function sizeBoard(){
+    const w = elBoard.clientWidth;
+    if (!w) return;
+    const root = document.documentElement.style;
+    root.setProperty("--gap", (w * 0.023).toFixed(2) + "px");
+    root.setProperty("--radius", (w * 0.042).toFixed(2) + "px");
+    const cell = (w * 0.954) / S.size;                  // board minus its padding, per cell
+    root.setProperty("--tile-font", Math.round(cell * 0.42) + "px");
+  }
+
   function buildGrid(){
     document.documentElement.style.setProperty("--n", S.size);
     elTiles.dataset.n = S.size;
     elGrid.innerHTML = "";
     for (let i = 0; i < S.size * S.size; i++) elGrid.appendChild(document.createElement("div"));
+    sizeBoard();
   }
 
   function place(node, t){
@@ -841,6 +997,7 @@
     }
 
     paintPanels();
+    announce();
     $("undo").disabled = S.mode === "noundo" || S.history.length === 0;
 
     if (S.over) showOverlay(false);
@@ -848,6 +1005,18 @@
   }
 
   const MODE_NAMES = {classic:"CLASSIC", timed:"TIMED", noundo:"NO UNDO", daily:"DAILY"};
+
+  /** Screen readers get the numbers the board shows visually. */
+  let announceTimer = null;
+  function announce(){
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => {
+      const free = freeCells().length;
+      $("a11yStatus").textContent =
+        "Score " + S.score + ". Highest tile " + maxTile() + ". " + free + " free squares." +
+        (S.over ? " Game over." : "");
+    }, 260);
+  }
 
   function paintPanels(){
     $("score").textContent = S.score;
@@ -1042,13 +1211,29 @@
     sfx.tap();
   }
 
+  // --- first-run tutorial ---------------------------------------------------
+  function showTutorial(){
+    $("tutorial").classList.add("show");
+    $("tutorial").setAttribute("aria-hidden", "false");
+  }
+  function dismissTutorial(){
+    const el = $("tutorial");
+    if (!el.classList.contains("show")) return false;
+    el.classList.remove("show");
+    el.setAttribute("aria-hidden", "true");
+    prefs.tutorialDone = true; savePrefs();
+    return true;
+  }
+  const tutorialOpen = () => $("tutorial").classList.contains("show");
+
   // --- screens, sheets, toast ----------------------------------------------
   const anySheetOpen = () => !!document.querySelector(".sheet.show");
-  const isPlaying = () => $("game").classList.contains("active") && !anySheetOpen();
+  const isPlaying = () => $("game").classList.contains("active") && !anySheetOpen() && !tutorialOpen();
 
   function showScreen(id){
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
     if (id === "menu") paintMenuNote();
+    if (id === "game") sizeBoard();          // the board has no width while it is hidden
   }
   function openSheet(id){ $(id).classList.add("show"); sfx.tap(); }
   function closeSheet(id){ $(id).classList.remove("show"); sfx.tap(); }
@@ -1125,7 +1310,7 @@
   document.addEventListener("keydown", e => {
     const map = {ArrowUp:0, ArrowRight:1, ArrowDown:2, ArrowLeft:3,
                  w:0, d:1, s:2, a:3, W:0, D:1, S:2, A:3};
-    if (e.key in map){ e.preventDefault(); move(map[e.key]); }
+    if (e.key in map){ e.preventDefault(); if (!dismissTutorial()) move(map[e.key]); }
     else if (e.key === "z" || e.key === "Z"){ if (isPlaying()) undo(); }
     else if (e.key === "h" || e.key === "H"){ showHint(); }
     else if (e.key === "Escape"){ goBack(); }
@@ -1156,6 +1341,7 @@
 
   function handleSwipe(dx, dy){
     if (Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
+    if (dismissTutorial()) return;
     if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 3);
     else move(dy > 0 ? 2 : 0);
   }
@@ -1164,6 +1350,7 @@
   $("play").addEventListener("click", () => {
     sfx.tap();
     showScreen("game");
+    if (!prefs.tutorialDone) showTutorial();
     if (S.mode === "timed" && !S.over) startTimer();
   });
   $("openModes").addEventListener("click", () => {
@@ -1178,6 +1365,7 @@
     }
     newGame(pickSize, pickMode);
     showScreen("game");
+    if (!prefs.tutorialDone) showTutorial();
   });
   document.querySelectorAll("#sizeChips .chip").forEach(b =>
     b.addEventListener("click", () => { pickSize = +b.dataset.size; paintModes(); sfx.tap(); }));
@@ -1200,6 +1388,12 @@
   $("keepGoing").addEventListener("click", () => { sfx.tap(); wonDismissed = true; hideOverlay(); });
   $("shareBtn").addEventListener("click", share);
 
+  $("tutorial").addEventListener("click", () => { dismissTutorial(); sfx.tap(); });
+  $("replayTutorial").addEventListener("click", () => {
+    prefs.tutorialDone = false; savePrefs();
+    closeSheet("settingsSheet"); showScreen("game"); showTutorial();
+  });
+
   document.querySelectorAll(".sheet").forEach(sheet => {
     sheet.addEventListener("click", e => { if (e.target === sheet) sheet.classList.remove("show"); });
   });
@@ -1219,6 +1413,9 @@
   bindSwitch("swSound", "sound");
   bindSwitch("swVibe", "vibe", () => buzz(15));
   bindSwitch("swAnim", "anim", paintAnim);
+  bindSwitch("swAmbient", "ambient", () => { prefs.ambient ? ambient.start() : ambient.stop(); });
+  bindSwitch("swContrast", "contrast", paintContrast);
+  function paintContrast(){ document.documentElement.classList.toggle("hc", !!prefs.contrast); }
   function paintAnim(){ document.documentElement.classList.toggle("no-anim", !prefs.anim); }
 
   $("resetAll").addEventListener("click", () => {
@@ -1250,6 +1447,7 @@
   function goBack(){
     const sheet = document.querySelector(".sheet.show");
     if (sheet){ sheet.classList.remove("show"); return true; }
+    if (dismissTutorial()) return true;
     if ($("game").classList.contains("active")){ showScreen("menu"); return true; }
     return false;
   }
@@ -1264,8 +1462,11 @@
   };
 
   // --- boot -----------------------------------------------------------------
+  if (!store.get(PREFS) && window.matchMedia && window.matchMedia("(prefers-contrast: more)").matches){
+    prefs.contrast = true;           // follow the system on first run only
+  }
   applyTheme(prefs.theme);
-  paintSoundBtn(); paintAnim(); makeBubbles(); paintModes();
+  paintSoundBtn(); paintAnim(); paintContrast(); makeBubbles(); paintModes();
 
   if (load() && cells().length){
     wonDismissed = S.won;
@@ -1280,7 +1481,19 @@
   if (go) window.__shortcut(go);
 
   document.addEventListener("gesturestart", e => e.preventDefault());
-  document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden){ save(); ambient.stop(); }
+    else if (prefs.ambient) ambient.start();
+  });
+
+  // autoplay rules: the pad can only start once the player has touched the screen
+  const firstGesture = () => { ambient.start(); };
+  document.addEventListener("pointerdown", firstGesture, {once:true});
+  document.addEventListener("keydown", firstGesture, {once:true});
+
+  window.addEventListener("resize", sizeBoard);
+  window.addEventListener("orientationchange", () => setTimeout(sizeBoard, 120));
+  sizeBoard();
 
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
     navigator.serviceWorker.register("sw.js").catch(() => {});
