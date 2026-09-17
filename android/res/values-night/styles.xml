@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Dark variant so the WebView reports prefers-color-scheme: dark to the page. -->
-    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/board_bg</item>
-        <item name="android:colorPrimaryDark">@color/board_bg</item>
-    </style>
-</resources>

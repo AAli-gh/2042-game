@@ -9,12 +9,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="$ROOT/android"
-OUT="${1:-$ROOT/dist/2042.apk}"
+OUT="${1:-$ROOT/dist/2048.apk}"
 BUILD="$APP/build"
 ANDROID_JAR="${ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-23/android.jar}"
 KEYSTORE="${KEYSTORE:-$APP/debug.keystore}"
 KS_PASS="${KS_PASS:-android}"
-KS_ALIAS="${KS_ALIAS:-game2042}"
+KS_ALIAS="${KS_ALIAS:-game2048}"
 
 [ -f "$ANDROID_JAR" ] || { echo "android.jar not found at $ANDROID_JAR"; exit 1; }
 
@@ -58,7 +58,7 @@ if [ ! -f "$KEYSTORE" ]; then
   echo "==> creating signing key ($KEYSTORE)"
   keytool -genkeypair -v -keystore "$KEYSTORE" -storepass "$KS_PASS" -keypass "$KS_PASS" \
     -alias "$KS_ALIAS" -keyalg RSA -keysize 2048 -validity 10950 \
-    -dname "CN=2042 Game, OU=Dev, O=2042, C=US" >/dev/null
+    -dname "CN=2048 Game, OU=Dev, O=2048, C=US" >/dev/null
 fi
 
 echo "==> signing"

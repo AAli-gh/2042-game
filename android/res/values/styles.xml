@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- No action bar: the game draws its own header, and the board should get the whole screen. -->
-    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/board_bg</item>
-        <item name="android:colorPrimaryDark">@color/board_bg</item>
+    <!-- The page paints its own teal gradient, so the shell stays dark and chrome-less. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/gradient_top</item>
+        <item name="android:colorPrimaryDark">@color/gradient_top</item>
     </style>
 </resources>
