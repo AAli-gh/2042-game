@@ -310,7 +310,10 @@
     background:hsl(var(--h2) 60% 14% / .55); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
   }
   .sheet.show{display:flex;}
-  .card{width:100%; max-width:360px; max-height:86vh; overflow-y:auto; border-radius:26px; padding:22px;}
+  .card{
+    width:100%; max-width:360px; max-height:86vh; overflow-y:auto; border-radius:26px; padding:22px;
+    -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  }
   .card h2{margin:0 0 6px; font-size:19px; font-weight:700; letter-spacing:.14em; text-align:center;}
   .card p{margin:10px 0 0; font-size:13px; line-height:1.9; color:var(--ink-dim); text-align:center;}
   .card .close{width:100%; margin-top:18px; border-radius:999px; padding:14px 0; font-weight:600; letter-spacing:.14em;}
@@ -343,16 +346,30 @@
   .sw-midnight{background:linear-gradient(160deg,hsl(230 58% 22%),hsl(214 70% 52%));}
 
   /* levels */
+  /* A hundred blurred buttons inside a blurred, scrolling card cost a re-blur every frame,
+     so this card paints flat: plain translucent fills, no backdrop-filter, no drop shadows. */
+  #levelsSheet .card{
+    -webkit-backdrop-filter:none; backdrop-filter:none;
+    background:hsl(var(--h2) 58% 17% / .94);
+    contain:paint;
+  }
   .level-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px;}
   .lv{
     position:relative; aspect-ratio:1/1; border-radius:14px; padding:0;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
     font-size:15px; font-weight:700;
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.28);
+    box-shadow:none;
+    -webkit-backdrop-filter:none; backdrop-filter:none;
+    contain:layout paint style;
+    transition:none;
   }
+  .lv:active{background:rgba(255,255,255,.2);}
   .lv small{font-size:9px; letter-spacing:.06em; color:hsl(var(--h) 100% 88%); line-height:1;}
   .lv.locked{opacity:.38;}
   .lv.done{background:hsl(var(--h) 85% 62% / .38); border-color:rgba(255,255,255,.7);}
-  .lv.current{box-shadow:0 0 0 2px #fff, var(--shadow);}
+  .lv.current{box-shadow:0 0 0 2px #fff;}
   .stars{display:flex; gap:8px; font-size:26px; line-height:1;}
   .stars i{font-style:normal; opacity:.28;}
   .stars i.on{opacity:1; text-shadow:0 0 16px hsl(var(--h) 100% 75% / .9); animation:starPop .4s ease-out backwards;}
@@ -1968,7 +1985,14 @@
   sizeBoard();
 
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // updateViaCache:"none" keeps the browser from serving a stale worker script
+    navigator.serviceWorker.register("sw.js", {updateViaCache:"none"})
+      .then(reg => {
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
   }
 })();
 </script>

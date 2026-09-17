@@ -1,0 +1,6 @@
+# Netlify / Cloudflare Pages: never let the browser hold on to an old service worker,
+# otherwise a returning player can stay on a stale build for up to a day.
+/sw.js
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
