@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Window background, shown before the WebView paints so there is no white flash.
+     The centred image must be a real bitmap: @mipmap/ic_launcher resolves to the
+     adaptive-icon XML on API 26+, and inflating that as a <bitmap> crashes at launch. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="@color/gradient_top"
+                android:endColor="@color/gradient_bottom" />
+        </shape>
+    </item>
+    <item>
+        <bitmap android:src="@mipmap/ic_launcher_fg" android:gravity="center" />
+    </item>
+</layer-list>

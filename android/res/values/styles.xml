@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The page paints its own gradient, so the shell stays chrome-less; the window background
+         doubles as the launch splash. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="android:colorPrimaryDark">@color/gradient_top</item>
+    </style>
+</resources>

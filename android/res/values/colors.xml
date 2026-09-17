@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- top and bottom of the page gradient, used for the system bars -->
+    <color name="gradient_top">#0a4257</color>
+    <color name="gradient_bottom">#2fe0cd</color>
+</resources>
