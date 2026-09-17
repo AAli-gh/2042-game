@@ -8,12 +8,15 @@ import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.TextView;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +35,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            startUp();
+        } catch (Throwable t) {
+            // Better a readable message on screen than a silent disappearance at launch.
+            showFailure(t);
+        }
+    }
 
+    private void startUp() {
         setBars(getResources().getColor(R.color.gradient_top),
                 getResources().getColor(R.color.gradient_bottom));
 
@@ -73,6 +84,19 @@ public class MainActivity extends Activity {
         setContentView(web);
 
         publishShortcuts();
+    }
+
+    private void showFailure(Throwable t) {
+        StringWriter trace = new StringWriter();
+        t.printStackTrace(new PrintWriter(trace));
+        TextView view = new TextView(this);
+        view.setText("2048 could not start.\n\n" + trace);
+        view.setTextSize(11f);
+        view.setPadding(24, 64, 24, 24);
+        view.setTextColor(Color.WHITE);
+        view.setBackgroundColor(Color.parseColor("#0a4257"));
+        view.setTextIsSelectable(true);
+        setContentView(view);
     }
 
     private String pageFor(Intent intent) {
