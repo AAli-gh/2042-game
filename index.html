@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#faf8ef">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="بازی ۲۰۴۲ - نسخه موبایل">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>۲۰۴۲</title>
+<style>
+  :root{
+    --bg:#faf8ef; --text:#776e65; --board:#bbada0; --cell:rgba(238,228,218,.35);
+    --btn:#8f7a66; --btn-text:#f9f6f2; --muted:#bbada0;
+    --gap:2.4vw; --radius:1.4vw;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1b1917; --text:#e8e0d8; --board:#3a332e; --cell:rgba(255,255,255,.06);
+      --btn:#8f7a66; --btn-text:#f9f6f2; --muted:#6e635b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1b1917; --text:#e8e0d8; --board:#3a332e; --cell:rgba(255,255,255,.06);
+    --btn:#8f7a66; --btn-text:#f9f6f2; --muted:#6e635b;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"Vazirmatn","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:max(12px,env(safe-area-inset-top)) 16px max(12px,env(safe-area-inset-bottom));
+    overscroll-behavior:none; touch-action:manipulation; user-select:none;
+  }
+  .wrap{width:100%; max-width:min(92vw, 460px);}
+  header{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;}
+  h1{margin:0; font-size:clamp(28px,9vw,52px); font-weight:800; letter-spacing:-1px;}
+  .scores{display:flex; gap:8px;}
+  .score{
+    background:var(--board); color:#f9f6f2; border-radius:6px;
+    padding:6px 12px; min-width:74px; text-align:center; line-height:1.15;
+  }
+  .score .label{display:block; font-size:11px; opacity:.85; letter-spacing:.5px;}
+  .score .value{display:block; font-size:clamp(16px,5vw,22px); font-weight:700; font-variant-numeric:tabular-nums;}
+  .bar{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;}
+  .hint{font-size:13px; opacity:.75; flex:1; line-height:1.5;}
+  button{
+    font-family:inherit; font-size:14px; font-weight:700; cursor:pointer;
+    background:var(--btn); color:var(--btn-text); border:0; border-radius:6px;
+    padding:10px 14px; transition:filter .15s;
+  }
+  button:active{filter:brightness(.88);}
+  button:disabled{opacity:.45; cursor:default;}
+  .actions{display:flex; gap:8px;}
+
+  .board{
+    position:relative; width:100%; aspect-ratio:1/1;
+    background:var(--board); border-radius:var(--radius); padding:var(--gap);
+    touch-action:none;
+  }
+  .grid{position:absolute; inset:var(--gap); direction:ltr; display:grid;
+    grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(4,1fr); gap:var(--gap);}
+  .grid div{background:var(--cell); border-radius:var(--radius);}
+  /* the playfield itself is laid out left-to-right so swipe direction matches what you see */
+  .tiles{position:absolute; inset:var(--gap); direction:ltr;}
+  .tile{
+    position:absolute; width:calc((100% - 3*var(--gap))/4); height:calc((100% - 3*var(--gap))/4);
+    display:flex; align-items:center; justify-content:center;
+    border-radius:var(--radius); font-weight:800; font-variant-numeric:tabular-nums;
+    background:#eee4da; color:#776e65; font-size:clamp(20px,7.5vw,38px);
+    transition:transform .1s ease-in-out; will-change:transform;
+  }
+  .tile.new{animation:pop .16s ease-in-out;}
+  .tile.merged{animation:bump .16s ease-in-out;}
+  @keyframes pop{from{transform:var(--pos) scale(.2);}to{transform:var(--pos) scale(1);}}
+  @keyframes bump{0%{transform:var(--pos) scale(1);}50%{transform:var(--pos) scale(1.18);}100%{transform:var(--pos) scale(1);}}
+  @media (prefers-reduced-motion: reduce){ .tile{transition:none;} .tile.new,.tile.merged{animation:none;} }
+
+  .t2{background:#eee4da}.t4{background:#ede0c8}
+  .t8{background:#f2b179;color:#f9f6f2}.t16{background:#f59563;color:#f9f6f2}
+  .t32{background:#f67c5f;color:#f9f6f2}.t64{background:#f65e3b;color:#f9f6f2}
+  .t128{background:#edcf72;color:#f9f6f2;font-size:clamp(17px,6.3vw,32px)}
+  .t256{background:#edcc61;color:#f9f6f2;font-size:clamp(17px,6.3vw,32px)}
+  .t512{background:#edc850;color:#f9f6f2;font-size:clamp(17px,6.3vw,32px)}
+  .t1024{background:#edc53f;color:#f9f6f2;font-size:clamp(13px,5vw,26px)}
+  .t2048{background:#edc22e;color:#f9f6f2;font-size:clamp(13px,5vw,26px);box-shadow:0 0 24px rgba(243,215,116,.6)}
+  .tbig{background:#3c3a32;color:#f9f6f2;font-size:clamp(12px,4.4vw,23px)}
+
+  .overlay{
+    position:absolute; inset:0; border-radius:var(--radius);
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(238,228,218,.78); color:#776e65; text-align:center; z-index:5;
+    backdrop-filter:blur(2px);
+  }
+  :root[data-theme="dark"] .overlay{background:rgba(27,25,23,.8); color:#e8e0d8;}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .overlay{background:rgba(27,25,23,.8); color:#e8e0d8;}}
+  .overlay.show{display:flex;}
+  .overlay .msg{font-size:clamp(26px,8vw,44px); font-weight:800;}
+  .overlay .sub{font-size:14px; opacity:.8; margin-top:-8px;}
+  footer{margin-top:14px; font-size:12px; opacity:.6; text-align:center; line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>۲۰۴۲</h1>
+    <div class="scores">
+      <div class="score"><span class="label">امتیاز</span><span class="value" id="score">۰</span></div>
+      <div class="score"><span class="label">رکورد</span><span class="value" id="best">۰</span></div>
+    </div>
+  </header>
+
+  <div class="bar">
+    <p class="hint">انگشتت رو روی صفحه بکش تا خانه‌ها حرکت کنن. دوتای هم‌عدد با هم جمع می‌شن — به ۲۰۴۸ برس!</p>
+    <div class="actions">
+      <button id="undo" type="button" title="بازگشت یک حرکت">↶</button>
+      <button id="restart" type="button">بازی جدید</button>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <div class="grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="overlay" id="overlay">
+      <div class="msg" id="overlayMsg"></div>
+      <div class="sub" id="overlaySub"></div>
+      <div class="actions">
+        <button id="keepGoing" type="button" style="display:none">ادامه بده</button>
+        <button id="tryAgain" type="button">دوباره</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>با کشیدن انگشت یا کلیدهای جهت‌دار بازی کن · امتیاز و رکورد ذخیره می‌شه</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const SIZE = 4, KEY = "game2042.state", BEST_KEY = "game2042.best";
+  const faNum = n => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+  };
+
+  const elTiles   = document.getElementById("tiles");
+  const elBoard   = document.getElementById("board");
+  const elScore   = document.getElementById("score");
+  const elBest    = document.getElementById("best");
+  const elOverlay = document.getElementById("overlay");
+  const elMsg     = document.getElementById("overlayMsg");
+  const elSub     = document.getElementById("overlaySub");
+  const btnKeep   = document.getElementById("keepGoing");
+
+  let grid, score, best, won, over, history, uid = 0;
+  let vanishing = [];   // tiles that merged away: slide them over, then delete
+
+  function emptyGrid(){
+    return Array.from({length:SIZE}, () => Array.from({length:SIZE}, () => null));
+  }
+
+  function cells(){
+    const out = [];
+    for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (grid[r][c]) out.push(grid[r][c]);
+    return out;
+  }
+
+  function freeCells(){
+    const out = [];
+    for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (!grid[r][c]) out.push({r,c});
+    return out;
+  }
+
+  function addRandomTile(){
+    const free = freeCells();
+    if (!free.length) return;
+    const {r,c} = free[Math.floor(Math.random()*free.length)];
+    grid[r][c] = {id:++uid, value: Math.random() < 0.9 ? 2 : 4, r, c, isNew:true, merged:false};
+  }
+
+  function snapshot(){
+    return JSON.stringify({
+      grid: grid.map(row => row.map(t => t ? {id:t.id, value:t.value, r:t.r, c:t.c} : null)),
+      score, won, over, uid
+    });
+  }
+
+  function restore(snap){
+    const s = JSON.parse(snap);
+    grid  = s.grid.map(row => row.map(t => t ? {...t, isNew:false, merged:false} : null));
+    score = s.score; won = s.won; over = s.over; uid = s.uid;
+  }
+
+  function save(){
+    store.set(KEY, JSON.stringify({snap: snapshot(), history: history.slice(-1)}));
+    store.set(BEST_KEY, String(best));
+  }
+
+  function load(){
+    best = parseInt(store.get(BEST_KEY) || "0", 10) || 0;
+    const raw = store.get(KEY);
+    if (!raw) return false;
+    try {
+      const data = JSON.parse(raw);
+      restore(data.snap);
+      history = Array.isArray(data.history) ? data.history : [];
+      return true;
+    } catch(e){ return false; }
+  }
+
+  function resetNodes(){
+    vanishing = [];
+    for (const [, node] of nodes) node.remove();
+    nodes.clear();
+  }
+
+  function newGame(){
+    resetNodes();
+    grid = emptyGrid(); score = 0; won = false; over = false; history = []; uid = 0;
+    addRandomTile(); addRandomTile();
+    hideOverlay(); render(); save();
+  }
+
+  // --- movement -------------------------------------------------------------
+  // dir: 0=up 1=right 2=down 3=left
+  const VECT = [{dr:-1,dc:0},{dr:0,dc:1},{dr:1,dc:0},{dr:0,dc:-1}];
+
+  function traversals(dir){
+    const rows = [...Array(SIZE).keys()], cols = [...Array(SIZE).keys()];
+    if (dir === 2) rows.reverse();
+    if (dir === 1) cols.reverse();
+    return {rows, cols};
+  }
+
+  function inBounds(r,c){ return r>=0 && r<SIZE && c>=0 && c<SIZE; }
+
+  function findFarthest(r, c, v){
+    let pr = r, pc = c;
+    while (inBounds(pr+v.dr, pc+v.dc) && !grid[pr+v.dr][pc+v.dc]) { pr += v.dr; pc += v.dc; }
+    const nr = pr + v.dr, nc = pc + v.dc;
+    return {far:{r:pr,c:pc}, next: inBounds(nr,nc) ? grid[nr][nc] : null};
+  }
+
+  function move(dir){
+    if (over) return false;
+    const before = snapshot();
+    const v = VECT[dir], {rows, cols} = traversals(dir);
+    let moved = false, gained = 0;
+
+    cells().forEach(t => { t.isNew = false; t.merged = false; });
+
+    for (const r of rows) for (const c of cols){
+      const tile = grid[r][c];
+      if (!tile) continue;
+      const {far, next} = findFarthest(r, c, v);
+      if (next && next.value === tile.value && !next.merged){
+        const merged = {id: ++uid, value: tile.value*2, r: next.r, c: next.c, isNew:false, merged:true};
+        // the two source tiles slide into place, then disappear under the merged tile
+        vanishing.push({id: tile.id, r: next.r, c: next.c}, {id: next.id, r: next.r, c: next.c});
+        grid[next.r][next.c] = merged;
+        grid[r][c] = null;
+        gained += merged.value;
+        if (merged.value === 2048 && !won) won = true;
+        moved = true;
+      } else if (far.r !== r || far.c !== c){
+        grid[r][c] = null;
+        tile.r = far.r; tile.c = far.c;
+        grid[far.r][far.c] = tile;
+        moved = true;
+      }
+    }
+
+    if (!moved) return false;
+
+    score += gained;
+    if (score > best) best = score;
+    history.push(before);
+    if (history.length > 1) history.shift();
+    addRandomTile();
+    if (!movesAvailable()) over = true;
+    render(); save();
+    if (gained && navigator.vibrate) { try { navigator.vibrate(8); } catch(e){} }
+    return true;
+  }
+
+  function movesAvailable(){
+    if (freeCells().length) return true;
+    for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++){
+      const v = grid[r][c].value;
+      if (c+1<SIZE && grid[r][c+1].value === v) return true;
+      if (r+1<SIZE && grid[r+1][c].value === v) return true;
+    }
+    return false;
+  }
+
+  function undo(){
+    if (!history.length) return;
+    resetNodes();
+    restore(history.pop());
+    hideOverlay(); render(); save();
+  }
+
+  // --- rendering ------------------------------------------------------------
+  const nodes = new Map();
+
+  function classFor(v){
+    if (v > 2048) return "tile tbig";
+    return "tile t" + v;
+  }
+
+  function place(node, t){
+    const pos = `translate(calc(${t.c} * (100% + var(--gap))), calc(${t.r} * (100% + var(--gap))))`;
+    node.style.setProperty("--pos", pos);
+    node.style.transform = pos;
+  }
+
+  function render(){
+    const live = new Set();
+    for (const t of cells()){
+      live.add(t.id);
+      let node = nodes.get(t.id);
+      if (!node){
+        node = document.createElement("div");
+        node.textContent = faNum(t.value);
+        elTiles.appendChild(node);
+        nodes.set(t.id, node);
+        if (t.merged){
+          // merged tile starts at its final spot, under the incoming tiles
+          node.className = classFor(t.value) + " merged";
+          node.style.zIndex = "1";
+        } else {
+          node.className = classFor(t.value) + (t.isNew ? " new" : "");
+        }
+        place(node, t);
+      } else {
+        node.className = classFor(t.value);
+        node.textContent = faNum(t.value);
+        place(node, t);
+      }
+    }
+    // slide merged-away tiles to the merge point, then drop them
+    const fading = new Set();
+    for (const v of vanishing){
+      const node = nodes.get(v.id);
+      if (!node) continue;
+      fading.add(v.id);
+      node.style.zIndex = "0";
+      place(node, v);
+      nodes.delete(v.id);
+      setTimeout(() => node.remove(), 110);
+    }
+    vanishing = [];
+
+    for (const [id, node] of nodes){
+      if (!live.has(id)){ node.remove(); nodes.delete(id); }
+    }
+
+    elScore.textContent = faNum(score);
+    elBest.textContent  = faNum(best);
+    document.getElementById("undo").disabled = history.length === 0;
+
+    if (over) showOverlay("باختی!", "دیگه حرکتی نمونده", false);
+    else if (won && !wonDismissed) showOverlay("بردی! ۲۰۴۸", "می‌تونی ادامه بدی", true);
+  }
+
+  let wonDismissed = false;
+  function showOverlay(msg, sub, keep){
+    elMsg.textContent = msg; elSub.textContent = sub;
+    btnKeep.style.display = keep ? "" : "none";
+    elOverlay.classList.add("show");
+  }
+  function hideOverlay(){ elOverlay.classList.remove("show"); }
+
+  // --- input ----------------------------------------------------------------
+  document.addEventListener("keydown", e => {
+    const map = {ArrowUp:0, ArrowRight:1, ArrowDown:2, ArrowLeft:3,
+                 w:0, d:1, s:2, a:3, W:0, D:1, S:2, A:3};
+    if (e.key in map){ e.preventDefault(); move(map[e.key]); }
+    else if (e.key === "z" || e.key === "Z"){ undo(); }
+  }, {passive:false});
+
+  let startX = 0, startY = 0, tracking = false;
+  const THRESHOLD = 22;
+
+  elBoard.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY; tracking = true;
+  }, {passive:true});
+
+  elBoard.addEventListener("touchmove", e => {
+    if (tracking) e.preventDefault();
+  }, {passive:false});
+
+  elBoard.addEventListener("touchend", e => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    handleSwipe(t.clientX - startX, t.clientY - startY);
+  }, {passive:true});
+
+  let mouseDown = false;
+  elBoard.addEventListener("mousedown", e => { mouseDown = true; startX = e.clientX; startY = e.clientY; });
+  window.addEventListener("mouseup", e => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    handleSwipe(e.clientX - startX, e.clientY - startY);
+  });
+
+  function handleSwipe(dx, dy){
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < THRESHOLD) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 3);
+    else move(dy > 0 ? 2 : 0);
+  }
+
+  document.getElementById("restart").addEventListener("click", () => { wonDismissed = false; newGame(); });
+  document.getElementById("tryAgain").addEventListener("click", () => { wonDismissed = false; newGame(); });
+  document.getElementById("undo").addEventListener("click", undo);
+  btnKeep.addEventListener("click", () => { wonDismissed = true; hideOverlay(); });
+
+  // block pull-to-refresh / double-tap zoom on the page itself
+  document.addEventListener("gesturestart", e => e.preventDefault());
+
+  // --- boot -----------------------------------------------------------------
+  if (load() && cells().length){ wonDismissed = won; render(); }
+  else newGame();
+
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
