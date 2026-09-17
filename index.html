@@ -361,6 +361,30 @@
   @keyframes starPop{from{transform:scale(.2) rotate(-25deg); opacity:0;} to{transform:scale(1) rotate(0); opacity:1;}}
   .no-anim .stars i.on{animation:none;}
 
+  .award{
+    display:flex; align-items:center; gap:10px; padding:10px 18px; border-radius:999px;
+    background:hsl(var(--h) 85% 62% / .3); border:1px solid rgba(255,255,255,.6);
+    animation:starPop .45s ease-out backwards; animation-delay:.3s;
+  }
+  .badge-icon{font-size:26px; line-height:1;}
+  .badge-name{font-size:13px; font-weight:700; letter-spacing:.14em;}
+
+  .chapter{
+    grid-column:1 / -1; margin:10px 0 2px; font-size:10px; letter-spacing:.2em;
+    color:var(--ink-dim); text-align:center;
+  }
+
+  .trophies{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:10px;}
+  .trophy{
+    width:72px; padding:9px 4px; border-radius:16px; text-align:center;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+  }
+  .trophy .ic{font-size:22px; line-height:1.2; filter:grayscale(1); opacity:.4;}
+  .trophy .nm{font-size:8px; letter-spacing:.1em; color:var(--ink-dim); margin-top:3px;}
+  .trophy.won{background:hsl(var(--h) 85% 62% / .28); border-color:rgba(255,255,255,.65);}
+  .trophy.won .ic{filter:none; opacity:1; text-shadow:0 0 14px hsl(var(--h) 100% 75% / .8);}
+  .trophy.won .nm{color:var(--ink);}
+
   /* stats */
   .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;}
   .stat{border-radius:16px; padding:12px 8px; text-align:center; background:rgba(255,255,255,.1);
@@ -464,6 +488,7 @@
     <div class="overlay" id="overlay">
       <div class="msg" id="overlayMsg"></div>
       <div class="stars" id="overlayStars" style="display:none"></div>
+      <div class="award" id="badgeAward" style="display:none"></div>
       <div class="sub" id="overlaySub"></div>
       <div class="row">
         <button id="nextLevel" type="button" style="display:none">NEXT LEVEL</button>
@@ -551,7 +576,10 @@
       <div class="stat"><b id="stTile">0</b><span>BEST TILE</span></div>
       <div class="stat"><b id="stAvg">0</b><span>AVG SCORE</span></div>
     </div>
+    <p class="cap" style="margin-top:16px; text-align:center">TILE MEDALS</p>
     <div class="medals" id="medals"></div>
+    <p class="cap" style="margin-top:16px; text-align:center">TROPHIES</p>
+    <div class="trophies" id="trophies"></div>
     <div class="top-list" id="topList"></div>
     <button class="close" id="closeStats" type="button">CLOSE</button>
   </div>
@@ -594,42 +622,127 @@
   /**
    * The campaign. Every level has one goal and one budget, so three stars always
    * mean the same thing: finish with at least half the budget still in hand.
-   * Budgets are 2.5x the median the built-in solver needs (1.6x for the timed ones), so
-   * finishing at all earns a star and solver-grade play earns three.
+   * The whole table is generated from solver measurements: the expectimax behind the HINT
+   * button played every goal repeatedly, and each budget is 2.5x its median move count
+   * (1.6x for a clock; 2.0x/1.3x on the levels marked tight by difficulty ranking). So
+   * finishing at all earns a star, and solver-grade play earns three. Goals the solver
+   * itself failed more than half the time were dropped, and level 100 is the game's
+   * namesake: 2048 on a 4x4 board.
    */
   const LEVELS = [
-    {id:1,  size:4, tile:32,    moves:50},
-    {id:2,  size:4, tile:64,    moves:100},
-    {id:3,  size:4, score:400,  moves:120},
-    {id:4,  size:4, tile:128,   moves:175},
-    {id:5,  size:3, tile:64,    moves:95},
-    {id:6,  size:3, tile:128,   moves:180},
-    {id:7,  size:4, score:600,  seconds:110},
-    {id:8,  size:4, tile:128,   seconds:110},
-    {id:9,  size:4, score:1200, seconds:190},
-    {id:10, size:5, tile:128,   moves:230},
-    {id:11, size:4, tile:128,   moves:160, noUndo:true},
-    {id:12, size:4, score:1500, moves:325},
-    {id:13, size:5, score:1500, moves:360},
-    {id:14, size:4, tile:256,   moves:345},
-    {id:15, size:3, score:600,  moves:160},
-    {id:16, size:6, tile:128,   moves:250},
-    {id:17, size:5, tile:256,   moves:375},
-    {id:18, size:4, tile:256,   seconds:210},
-    {id:19, size:4, score:3000, moves:590},
-    {id:20, size:6, score:2000, moves:410},
-    {id:21, size:4, tile:256,   moves:330, noUndo:true},
-    {id:22, size:5, tile:512,   moves:675},
-    {id:23, size:4, score:4000, moves:640},
-    {id:24, size:3, score:1000, moves:240},
-    {id:25, size:6, tile:256,   moves:440},
-    {id:26, size:4, tile:512,   moves:625},
-    {id:27, size:4, score:6000, moves:970},
-    {id:28, size:5, score:6000, moves:1025, noUndo:true},
-    {id:29, size:6, tile:512,   moves:700},
-    {id:30, size:4, tile:1024,  moves:1250}
+    {id:1, size:3, tile:32, moves:45},
+    {id:2, size:3, tile:64, moves:90},
+    {id:3, size:4, tile:64, moves:115},
+    {id:4, size:4, score:400, moves:120},
+    {id:5, size:5, score:600, moves:180},
+    {id:6, size:4, tile:128, moves:190},
+    {id:7, size:5, tile:128, moves:215},
+    {id:8, size:4, score:1000, moves:230},
+    {id:9, size:6, tile:128, moves:240},
+    {id:10, size:5, score:1000, moves:250},
+    {id:11, size:4, score:1000, seconds:150},
+    {id:12, size:3, score:1000, seconds:155},
+    {id:13, size:5, score:1000, seconds:160},
+    {id:14, size:6, score:1000, seconds:165},
+    {id:15, size:4, tile:256, moves:325},
+    {id:16, size:4, score:1500, moves:330},
+    {id:17, size:5, score:1500, moves:360},
+    {id:18, size:4, tile:256, seconds:210},
+    {id:19, size:4, score:1500, seconds:215},
+    {id:20, size:5, score:2000, moves:400},
+    {id:21, size:5, tile:256, moves:405},
+    {id:22, size:4, tile:256, moves:325, noUndo:true},
+    {id:23, size:4, score:1500, moves:330, noUndo:true},
+    {id:24, size:5, score:2000, seconds:255},
+    {id:25, size:5, tile:256, seconds:260},
+    {id:26, size:6, tile:256, seconds:270},
+    {id:27, size:4, score:2000, moves:385, noUndo:true},
+    {id:28, size:5, score:2000, moves:400, noUndo:true},
+    {id:29, size:6, score:2000, moves:400, noUndo:true},
+    {id:30, size:5, tile:256, moves:405, noUndo:true},
+    {id:31, size:4, tile:256, moves:260, noUndo:true},
+    {id:32, size:6, tile:256, moves:420, noUndo:true},
+    {id:33, size:4, score:2000, seconds:200},
+    {id:34, size:5, score:3000, moves:590},
+    {id:35, size:5, score:2000, seconds:210},
+    {id:36, size:4, tile:512, moves:630},
+    {id:37, size:4, score:2000, moves:310, noUndo:true},
+    {id:38, size:5, score:2000, moves:320, noUndo:true},
+    {id:39, size:4, score:4000, moves:680},
+    {id:40, size:5, score:3000, seconds:380},
+    {id:41, size:5, tile:256, moves:325, noUndo:true},
+    {id:42, size:6, tile:512, moves:710},
+    {id:43, size:4, tile:512, seconds:405},
+    {id:44, size:4, score:3000, moves:470},
+    {id:45, size:5, score:3000, moves:475},
+    {id:46, size:6, score:3000, moves:475},
+    {id:47, size:4, score:4000, seconds:435},
+    {id:48, size:6, score:4000, seconds:445},
+    {id:49, size:4, tile:512, moves:505},
+    {id:50, size:5, tile:512, seconds:470},
+    {id:51, size:4, score:4000, moves:540},
+    {id:52, size:5, score:4000, moves:545},
+    {id:53, size:5, score:3000, seconds:310},
+    {id:54, size:6, score:4000, moves:555},
+    {id:55, size:6, tile:512, moves:565},
+    {id:56, size:4, tile:512, seconds:330},
+    {id:57, size:5, tile:512, moves:735, noUndo:true},
+    {id:58, size:5, score:6000, moves:990},
+    {id:59, size:6, score:3000, moves:475, noUndo:true},
+    {id:60, size:4, score:4000, seconds:350},
+    {id:61, size:6, score:4000, seconds:360},
+    {id:62, size:4, tile:512, moves:505, noUndo:true},
+    {id:63, size:4, score:6000, seconds:480},
+    {id:64, size:5, score:4000, moves:545, noUndo:true},
+    {id:65, size:6, score:4000, moves:555, noUndo:true},
+    {id:66, size:5, tile:512, moves:590, noUndo:true},
+    {id:67, size:4, score:6000, moves:775},
+    {id:68, size:5, score:6000, moves:790},
+    {id:69, size:4, tile:1024, moves:1300},
+    {id:70, size:6, score:6000, moves:805},
+    {id:71, size:6, score:8000, moves:1320},
+    {id:72, size:5, score:10000, moves:1410},
+    {id:73, size:6, tile:1024, moves:1460},
+    {id:74, size:5, score:6000, seconds:480},
+    {id:75, size:5, score:8000, moves:1000},
+    {id:76, size:4, score:6000, moves:775, noUndo:true},
+    {id:77, size:4, tile:1024, moves:1040},
+    {id:78, size:6, score:6000, moves:805, noUndo:true},
+    {id:79, size:6, score:8000, moves:1320, noUndo:true},
+    {id:80, size:4, score:10000, moves:1400, noUndo:true},
+    {id:81, size:5, score:10000, moves:1410, noUndo:true},
+    {id:82, size:6, tile:1024, moves:1165},
+    {id:83, size:6, score:10000, moves:1175},
+    {id:84, size:5, score:8000, moves:1000, noUndo:true},
+    {id:85, size:6, score:15000, moves:2175},
+    {id:86, size:4, score:8000, moves:1045, noUndo:true},
+    {id:87, size:6, score:8000, moves:1055, noUndo:true},
+    {id:88, size:5, score:10000, moves:1130, noUndo:true},
+    {id:89, size:5, tile:1024, moves:1870, noUndo:true},
+    {id:90, size:6, tile:1024, moves:1165, noUndo:true},
+    {id:91, size:6, score:10000, moves:1175, noUndo:true},
+    {id:92, size:4, tile:2048, moves:2570},
+    {id:93, size:4, score:15000, moves:2130, noUndo:true},
+    {id:94, size:5, score:15000, moves:1770},
+    {id:95, size:6, score:20000, moves:1970},
+    {id:96, size:5, tile:2048, moves:2480, noUndo:true},
+    {id:97, size:4, tile:2048, moves:2055},
+    {id:98, size:6, score:15000, moves:1740, noUndo:true},
+    {id:99, size:5, tile:2048, moves:1985, noUndo:true},
+    {id:100, size:4, tile:2048, moves:2570}
   ];
   const levelById = id => LEVELS.filter(l => l.id === id)[0] || null;
+
+  /** Campaign trophies. Each one is awarded once and kept forever. */
+  const BADGES = [
+    {id:"lv10",  icon:"🥉", name:"ROOKIE",       need:"Clear 10 levels",  levels:10},
+    {id:"lv25",  icon:"🥈", name:"CLIMBER",      need:"Clear 25 levels",  levels:25},
+    {id:"lv50",  icon:"🥇", name:"HALFWAY",      need:"Clear 50 levels",  levels:50},
+    {id:"lv75",  icon:"💎", name:"EXPERT",       need:"Clear 75 levels",  levels:75},
+    {id:"lv100", icon:"👑", name:"CHAMPION",     need:"Clear all levels", levels:100},
+    {id:"st150", icon:"⭐", name:"STAR HUNTER",  need:"Collect 150 stars", stars:150},
+    {id:"st300", icon:"🏆", name:"PERFECTIONIST", need:"Three stars on every level", stars:300}
+  ];
   const TIMED_SECONDS = 180;
 
   const store = {
@@ -654,11 +767,26 @@
   let levelStars = store.json(LEVELS_KEY, {});      // { "7": 3 }
   const saveLevels = () => store.set(LEVELS_KEY, JSON.stringify(levelStars));
   const levelUnlocked = id => id === 1 || !!levelStars[id - 1] || !!levelStars[id];
+  const levelsCleared = () => LEVELS.filter(l => levelStars[l.id]).length;
+  const starsEarned = () => LEVELS.reduce((sum, l) => sum + (levelStars[l.id] || 0), 0);
+  const badgeEarned = b => (b.levels ? levelsCleared() >= b.levels : starsEarned() >= b.stars);
+  const highestBadge = () => BADGES.filter(b => stats.badges.indexOf(b.id) >= 0).pop() || null;
+
+  /** Award anything newly deserved and celebrate the best of them. */
+  function checkBadges(){
+    const fresh = BADGES.filter(b => stats.badges.indexOf(b.id) < 0 && badgeEarned(b));
+    if (!fresh.length) return null;
+    fresh.forEach(b => stats.badges.push(b.id));
+    saveStats();
+    return fresh[fresh.length - 1];
+  }
   function nextLevelId(){
     for (const l of LEVELS) if (!levelStars[l.id]) return l.id;
     return 0;
   }
-  let stats   = Object.assign({games:0, moves:0, bestTile:0, totalScore:0, medals:[]}, store.json(STATS, {}));
+  let stats   = Object.assign({games:0, moves:0, bestTile:0, totalScore:0, medals:[], badges:[]},
+                              store.json(STATS, {}));
+  if (!Array.isArray(stats.badges)) stats.badges = [];
   let top     = store.json(TOP, []);
 
   const savePrefs = () => store.set(PREFS, JSON.stringify(prefs));
@@ -1050,6 +1178,8 @@
     if (!lvl) return;
     stopTimer();
     S.mode = "level"; S.level = id;
+    S.freshBadge = null;
+    $("badgeAward").style.display = "none";
     newGame(lvl.size, "level");
     S.timeLeft = lvl.seconds || TIMED_SECONDS;
     paintPanels(); save();
@@ -1066,6 +1196,11 @@
       const stars = levelStarsEarned();
       if (stars > (levelStars[lvl.id] || 0)){ levelStars[lvl.id] = stars; saveLevels(); }
       sfx.win(); buzz([0, 30, 40, 30, 40, 60]);
+      const badge = checkBadges();
+      if (badge){
+        S.freshBadge = badge;
+        setTimeout(() => { sfx.medal(); buzz([0, 25, 45, 25, 45, 80]); }, 500);
+      }
     } else {
       sfx.lose(); buzz([0, 40, 60, 40]);
     }
@@ -1323,6 +1458,10 @@
     const lvl = currentLevel(), won = S.levelResult === "win";
     const stars = won ? levelStarsEarned() : 0;
     $("overlayMsg").textContent = won ? "LEVEL " + lvl.id + " CLEAR" : "LEVEL FAILED";
+    const badge = won ? S.freshBadge : null;
+    $("badgeAward").style.display = badge ? "" : "none";
+    if (badge) $("badgeAward").innerHTML =
+      `<span class="badge-icon">${badge.icon}</span><span class="badge-name">${badge.name}</span>`;
     $("overlayStars").style.display = "";
     $("overlayStars").innerHTML = [1,2,3].map(i =>
       `<i class="${i <= stars ? "on" : ""}">★</i>`).join("");
@@ -1506,6 +1645,8 @@
     if (current) parts.push("IN PROGRESS " + (current.score || 0));
     else if (getBest()) parts.push("BEST " + getBest());
     if (daily && daily.day === todayKey()) parts.push("TODAY " + daily.score);
+    const badge = highestBadge();
+    if (badge) parts.push(badge.icon + " " + badge.name);
     $("menuNote").textContent = parts.join("  ·  ");
     $("play").textContent = current ? "CONTINUE" : "PLAY";
 
@@ -1539,6 +1680,14 @@
     $("medals").innerHTML = MEDALS.map(v =>
       `<div class="medal${stats.medals.includes(v) ? " won" : ""}">${v}</div>`).join("");
 
+    $("trophies").innerHTML = BADGES.map(b => {
+      const won = stats.badges.indexOf(b.id) >= 0;
+      return `<div class="trophy${won ? " won" : ""}" title="${b.need}">
+                <div class="ic">${b.icon}</div>
+                <div class="nm">${won ? b.name : b.need.toUpperCase()}</div>
+              </div>`;
+    }).join("");
+
     $("topList").innerHTML = top.length
       ? top.map((e, i) => {
           const d = new Date(e.ts).toLocaleDateString("en-GB", {day:"2-digit", month:"short"});
@@ -1549,22 +1698,26 @@
   }
 
   // --- levels sheet ---------------------------------------------------------
+  const CHAPTERS = ["WARM UP", "GETTING SERIOUS", "PRESSURE", "NO SAFETY NET", "MARATHON"];
+
   function paintLevels(){
-    const total = LEVELS.length * 3;
-    const earned = LEVELS.reduce((sum, l) => sum + (levelStars[l.id] || 0), 0);
-    const next = nextLevelId();
-    $("levelsNote").textContent = "★ " + earned + " / " + total +
-      (next ? "  ·  NEXT: LEVEL " + next : "  ·  ALL CLEAR");
+    const total = LEVELS.length * 3, earned = starsEarned(), next = nextLevelId();
+    const badge = highestBadge();
+    $("levelsNote").innerHTML = "★ " + earned + " / " + total +
+      "  ·  CLEARED " + levelsCleared() + " / " + LEVELS.length +
+      (next ? "  ·  NEXT: " + next : "  ·  ALL CLEAR") +
+      (badge ? "<br>" + badge.icon + " " + badge.name : "");
 
     $("levelGrid").innerHTML = LEVELS.map(l => {
       const stars = levelStars[l.id] || 0;
       const open = levelUnlocked(l.id);
       const cls = ["lv", open ? "" : "locked", stars ? "done" : "", l.id === next ? "current" : ""].join(" ");
-      const label = l.tile ? l.tile : l.score;
-      return `<button type="button" class="${cls}" data-level="${l.id}" ${open ? "" : "disabled"}
+      const head = (l.id - 1) % 20 === 0
+        ? `<div class="chapter">${CHAPTERS[(l.id - 1) / 20]} · ${l.id}–${l.id + 19}</div>` : "";
+      return head + `<button type="button" class="${cls}" data-level="${l.id}" ${open ? "" : "disabled"}
                aria-label="Level ${l.id}, ${stars} of 3 stars">
                 <span>${l.id}</span>
-                <small>${open ? (l.tile ? label : "⌁" + label) : "🔒"}</small>
+                <small>${open ? (l.tile ? l.tile : "⌁" + l.score) : "🔒"}</small>
                 <small>${open ? "★".repeat(stars) + "☆".repeat(3 - stars) : ""}</small>
               </button>`;
     }).join("");
@@ -1576,6 +1729,10 @@
         showScreen("game");
         if (!prefs.tutorialDone) showTutorial();
       }));
+
+    // open on the level the player is actually up to
+    const cur = $("levelGrid").querySelector(".lv.current");
+    if (cur) setTimeout(() => cur.scrollIntoView({block:"center"}), 0);
   }
 
   // --- modes sheet ----------------------------------------------------------
@@ -1687,7 +1844,7 @@
   $("closeSettings").addEventListener("click", () => closeSheet("settingsSheet"));
   $("aboutBtn").addEventListener("click", () => openSheet("aboutSheet"));
   $("closeAbout").addEventListener("click", () => closeSheet("aboutSheet"));
-  $("statsBtn").addEventListener("click", () => { paintStats(); openSheet("statsSheet"); });
+  $("statsBtn").addEventListener("click", () => { checkBadges(); paintStats(); openSheet("statsSheet"); });
   $("closeStats").addEventListener("click", () => closeSheet("statsSheet"));
   $("likeBtn").addEventListener("click", () => { sfx.tap(); toast("Thanks for playing!"); });
 
@@ -1731,7 +1888,7 @@
   function paintAnim(){ document.documentElement.classList.toggle("no-anim", !prefs.anim); }
 
   $("resetAll").addEventListener("click", () => {
-    bestMap = {}; stats = {games:0, moves:0, bestTile:0, totalScore:0, medals:[]}; top = [];
+    bestMap = {}; stats = {games:0, moves:0, bestTile:0, totalScore:0, medals:[], badges:[]}; top = [];
     games = {}; saveGames(); store.del(LAST);
     levelStars = {}; saveLevels();
     saveBest(); saveStats(); saveTop(); store.del(DAILY);
