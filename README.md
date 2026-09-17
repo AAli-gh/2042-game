@@ -1,7 +1,22 @@
 # 2048 — بازی پازل موبایلی
 
+[![CI](https://github.com/AAli-gh/2042-game/actions/workflows/ci.yml/badge.svg)](https://github.com/AAli-gh/2042-game/actions/workflows/ci.yml)
+[![Release](https://github.com/AAli-gh/2042-game/actions/workflows/release.yml/badge.svg)](https://github.com/AAli-gh/2042-game/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 نسخهٔ موبایلیِ بازی کلاسیک ۲۰۴۸ با ظاهر شیشه‌ای (glassmorphism) روی گرادیان فیروزه‌ای،
 نوشته‌شده با HTML/CSS/JS خالص و بدون هیچ وابستگی.
+
+| منو | بازی (تم نئون) | مراحل |
+|---|---|---|
+| ![منو](docs/screenshots/menu.png) | ![بازی](docs/screenshots/game-neon.png) | ![مراحل](docs/screenshots/levels.png) |
+
+| پایان مرحله | آمار و نشان‌ها | حالت افقی |
+|---|---|---|
+| ![پایان مرحله](docs/screenshots/level-clear.png) | ![آمار](docs/screenshots/stats.png) | ![افقی](docs/screenshots/landscape.png) |
+
+**[دانلود APK](dist/2048.apk)** · نسخهٔ وب: بعد از فعال‌کردن GitHub Pages روی
+`https://aali-gh.github.io/2042-game/`
 
 ## امکانات
 
@@ -137,6 +152,45 @@ HINT است، **۶۲ ترکیبِ هدف و اندازهٔ تخته** را با�
 - هیچ مرحله‌ای بیش از حدود ۱۵ دقیقه طول نمی‌کشد (سقف روی میانهٔ حل‌کننده)
 
 نتیجه این است که صرفِ تمام‌کردن مرحله همیشه یک ستاره می‌دهد و سه ستاره یعنی بازی در حد همان حل‌کننده.
+
+## توسعه و تست
+
+مجموعهٔ تست با Playwright نوشته شده و روی پروفایل یک گوشی واقعی (Pixel 5) اجرا می‌شود؛
+۱۷ تست که منطق بازی، ذخیره‌سازی، مراحل، نشان‌ها، سرویس‌ورکر و دسترس‌پذیری را پوشش می‌دهند.
+
+```bash
+npm install
+npx playwright install chromium
+npm test              # سرور محلی خودش بالا می‌آید
+```
+
+فایل‌های تست در `tests/` هستند و اعداد مرحله را از خود رابط می‌خوانند، پس بازتولید جدول
+مراحل تست‌ها را نمی‌شکند.
+
+## خودکارسازی روی GitHub
+
+| Workflow | کِی اجرا می‌شود | کار |
+|---|---|---|
+| `ci.yml` | هر push و PR | تست‌های مرورگر + ساخت APK و بررسی امضا (خروجی به‌عنوان artifact) |
+| `release.yml` | با هر تگ `v*` | ساخت APK امضاشده و انتشار در Releases |
+| `pages.yml` | push روی `main` | انتشار نسخهٔ وب روی GitHub Pages |
+
+برای اینکه نسخه‌ها با **کلید ثابت** امضا شوند (تا به‌روزرسانی بدون حذف برنامه نصب شود)،
+این سه Secret را در `Settings → Secrets and variables → Actions` بساز:
+
+| Secret | مقدار |
+|---|---|
+| `KEYSTORE_BASE64` | خروجی `base64 -w0 your.keystore` |
+| `KEYSTORE_PASSWORD` | رمز keystore |
+| `KEY_ALIAS` | نام alias کلید |
+
+اگر این Secretها نباشند، بیلد با یک کلید یک‌بارمصرف امضا می‌شود و در Actions هشدار می‌دهد.
+
+انتشار یک نسخهٔ جدید:
+
+```bash
+git tag v1.6.1 && git push origin v1.6.1
+```
 
 ## قوانین بازی
 

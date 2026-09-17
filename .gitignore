@@ -4,3 +4,7 @@ android/build/
 # signing key: generated locally by android/build.sh, never committed
 android/debug.keystore
 dist/*.idsig
+test-results/
+playwright-report/
+build/
+android/*.keystore

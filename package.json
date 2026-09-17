@@ -1,0 +1,14 @@
+{
+  "name": "game2048",
+  "version": "1.6.1",
+  "private": true,
+  "description": "A glassy mobile take on the 2048 puzzle, as a web app and an Android APK",
+  "scripts": {
+    "test": "playwright test",
+    "serve": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "build:apk": "./android/build.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

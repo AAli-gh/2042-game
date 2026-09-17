@@ -1862,7 +1862,7 @@
   $("aboutBtn").addEventListener("click", () => openSheet("aboutSheet"));
   $("closeAbout").addEventListener("click", () => closeSheet("aboutSheet"));
   $("statsBtn").addEventListener("click", () => { checkBadges(); paintStats(); openSheet("statsSheet"); });
-  $("closeStats").addEventListener("click", () => closeSheet("statsSheet"));
+  $("closeStats").addEventListener("click", () => { closeSheet("statsSheet"); paintMenuNote(); });
   $("likeBtn").addEventListener("click", () => { sfx.tap(); toast("Thanks for playing!"); });
 
   const restartCurrent = () => { sfx.tap(); if (S.mode === "level") startLevel(S.level); else newGame(); };
