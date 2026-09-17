@@ -342,6 +342,25 @@
   .sw-sunset  {background:linear-gradient(160deg,hsl(340 58% 26%),hsl(22 70% 58%));}
   .sw-midnight{background:linear-gradient(160deg,hsl(230 58% 22%),hsl(214 70% 52%));}
 
+  /* levels */
+  .level-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px;}
+  .lv{
+    position:relative; aspect-ratio:1/1; border-radius:14px; padding:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    font-size:15px; font-weight:700;
+  }
+  .lv small{font-size:9px; letter-spacing:.06em; color:hsl(var(--h) 100% 88%); line-height:1;}
+  .lv.locked{opacity:.38;}
+  .lv.done{background:hsl(var(--h) 85% 62% / .38); border-color:rgba(255,255,255,.7);}
+  .lv.current{box-shadow:0 0 0 2px #fff, var(--shadow);}
+  .stars{display:flex; gap:8px; font-size:26px; line-height:1;}
+  .stars i{font-style:normal; opacity:.28;}
+  .stars i.on{opacity:1; text-shadow:0 0 16px hsl(var(--h) 100% 75% / .9); animation:starPop .4s ease-out backwards;}
+  .stars i.on:nth-child(2){animation-delay:.12s;}
+  .stars i.on:nth-child(3){animation-delay:.24s;}
+  @keyframes starPop{from{transform:scale(.2) rotate(-25deg); opacity:0;} to{transform:scale(1) rotate(0); opacity:1;}}
+  .no-anim .stars i.on{animation:none;}
+
   /* stats */
   .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;}
   .stat{border-radius:16px; padding:12px 8px; text-align:center; background:rgba(255,255,255,.1);
@@ -386,6 +405,7 @@
 
   <div class="menu-actions">
     <button class="big-btn" id="play" type="button">PLAY</button>
+    <button class="big-btn" id="openLevels" type="button">LEVELS</button>
     <button class="big-btn" id="openModes" type="button">MODES</button>
     <button class="big-btn" id="openSettings" type="button">SETTINGS</button>
   </div>
@@ -443,8 +463,10 @@
     </div>
     <div class="overlay" id="overlay">
       <div class="msg" id="overlayMsg"></div>
+      <div class="stars" id="overlayStars" style="display:none"></div>
       <div class="sub" id="overlaySub"></div>
       <div class="row">
+        <button id="nextLevel" type="button" style="display:none">NEXT LEVEL</button>
         <button id="keepGoing" type="button" style="display:none">KEEP GOING</button>
         <button id="tryAgain" type="button">NEW GAME</button>
         <button id="shareBtn" type="button">SHARE</button>
@@ -509,6 +531,16 @@
   </div>
 </div>
 
+<!-- ------------------------------- LEVELS ----------------------------- -->
+<div class="sheet" id="levelsSheet">
+  <div class="card glass">
+    <h2>LEVELS</h2>
+    <p id="levelsNote"></p>
+    <div class="level-grid" id="levelGrid"></div>
+    <button class="close" id="closeLevels" type="button">CLOSE</button>
+  </div>
+</div>
+
 <!-- ------------------------------- STATS ------------------------------ -->
 <div class="sheet" id="statsSheet">
   <div class="card glass">
@@ -557,6 +589,47 @@
   const DAILY = "game2048.daily";
   const WIN_TILE = 2048;
   const MEDALS = [256, 512, 1024, 2048, 4096];
+  const LEVELS_KEY = "game2048.levels";
+
+  /**
+   * The campaign. Every level has one goal and one budget, so three stars always
+   * mean the same thing: finish with at least half the budget still in hand.
+   * Budgets are 2.5x the median the built-in solver needs (1.6x for the timed ones), so
+   * finishing at all earns a star and solver-grade play earns three.
+   */
+  const LEVELS = [
+    {id:1,  size:4, tile:32,    moves:50},
+    {id:2,  size:4, tile:64,    moves:100},
+    {id:3,  size:4, score:400,  moves:120},
+    {id:4,  size:4, tile:128,   moves:175},
+    {id:5,  size:3, tile:64,    moves:95},
+    {id:6,  size:3, tile:128,   moves:180},
+    {id:7,  size:4, score:600,  seconds:110},
+    {id:8,  size:4, tile:128,   seconds:110},
+    {id:9,  size:4, score:1200, seconds:190},
+    {id:10, size:5, tile:128,   moves:230},
+    {id:11, size:4, tile:128,   moves:160, noUndo:true},
+    {id:12, size:4, score:1500, moves:325},
+    {id:13, size:5, score:1500, moves:360},
+    {id:14, size:4, tile:256,   moves:345},
+    {id:15, size:3, score:600,  moves:160},
+    {id:16, size:6, tile:128,   moves:250},
+    {id:17, size:5, tile:256,   moves:375},
+    {id:18, size:4, tile:256,   seconds:210},
+    {id:19, size:4, score:3000, moves:590},
+    {id:20, size:6, score:2000, moves:410},
+    {id:21, size:4, tile:256,   moves:330, noUndo:true},
+    {id:22, size:5, tile:512,   moves:675},
+    {id:23, size:4, score:4000, moves:640},
+    {id:24, size:3, score:1000, moves:240},
+    {id:25, size:6, tile:256,   moves:440},
+    {id:26, size:4, tile:512,   moves:625},
+    {id:27, size:4, score:6000, moves:970},
+    {id:28, size:5, score:6000, moves:1025, noUndo:true},
+    {id:29, size:6, tile:512,   moves:700},
+    {id:30, size:4, tile:1024,  moves:1250}
+  ];
+  const levelById = id => LEVELS.filter(l => l.id === id)[0] || null;
   const TIMED_SECONDS = 180;
 
   const store = {
@@ -578,6 +651,13 @@
                               store.json(PREFS, {}));
   let bestMap = store.json(BEST, {});
   let games   = store.json(GAMES, {});
+  let levelStars = store.json(LEVELS_KEY, {});      // { "7": 3 }
+  const saveLevels = () => store.set(LEVELS_KEY, JSON.stringify(levelStars));
+  const levelUnlocked = id => id === 1 || !!levelStars[id - 1] || !!levelStars[id];
+  function nextLevelId(){
+    for (const l of LEVELS) if (!levelStars[l.id]) return l.id;
+    return 0;
+  }
   let stats   = Object.assign({games:0, moves:0, bestTile:0, totalScore:0, medals:[]}, store.json(STATS, {}));
   let top     = store.json(TOP, []);
 
@@ -588,10 +668,13 @@
 
   // --- game state -----------------------------------------------------------
   const S = {size:4, mode:"classic", grid:null, score:0, won:false, over:false,
-             uid:0, draws:0, moves:0, history:[], timeLeft:TIMED_SECONDS, ended:false};
+             uid:0, draws:0, moves:0, history:[], timeLeft:TIMED_SECONDS, ended:false,
+             level:0, levelResult:null};
   let wonDismissed = false, vanishing = [], rngFn = Math.random, timer = null;
 
-  const bestKey = () => S.mode + ":" + S.size;
+  const bestKey = () => S.mode === "level" ? "level:" + S.level : S.mode + ":" + S.size;
+  const currentLevel = () => (S.mode === "level" ? levelById(S.level) : null);
+  const noUndoActive = () => S.mode === "noundo" || !!(currentLevel() || {}).noUndo;
   const getBest = () => bestMap[bestKey()] || 0;
   function setBest(v){ if (v > getBest()){ bestMap[bestKey()] = v; saveBest(); } }
 
@@ -733,7 +816,8 @@
   function snapshot(){
     return JSON.stringify({
       grid: S.grid.map(row => row.map(t => t ? {id:t.id, value:t.value, r:t.r, c:t.c} : null)),
-      score:S.score, won:S.won, over:S.over, uid:S.uid, draws:S.draws, moves:S.moves, timeLeft:S.timeLeft
+      score:S.score, won:S.won, over:S.over, uid:S.uid, draws:S.draws, moves:S.moves,
+      timeLeft:S.timeLeft, level:S.level, levelResult:S.levelResult
     });
   }
   function restore(snap){
@@ -741,6 +825,7 @@
     S.grid = s.grid.map(row => row.map(t => t ? {...t, isNew:false, merged:false} : null));
     S.score = s.score; S.won = s.won; S.over = s.over; S.uid = s.uid;
     S.draws = s.draws || 0; S.moves = s.moves || 0;
+    S.level = s.level || 0; S.levelResult = s.levelResult || null;
     S.timeLeft = (typeof s.timeLeft === "number") ? s.timeLeft : TIMED_SECONDS;
     rebuildRng();
   }
@@ -822,6 +907,8 @@
     S.grid = emptyGrid(S.size);
     S.score = 0; S.won = false; S.over = false; S.ended = false;
     S.uid = 0; S.draws = 0; S.moves = 0; S.history = []; S.timeLeft = TIMED_SECONDS;
+    S.levelResult = null;
+    if (S.mode !== "level") S.level = 0;
     wonDismissed = false;
     rebuildRng();
     addRandomTile(); addRandomTile();
@@ -883,7 +970,7 @@
 
     S.score += gained;
     setBest(S.score);
-    if (S.mode !== "noundo"){
+    if (!noUndoActive()){
       S.history.push(before);
       if (S.history.length > 20) S.history.shift();
     }
@@ -895,7 +982,8 @@
     if (top4 > stats.bestTile) stats.bestTile = top4;
     saveStats();
 
-    if (!movesAvailable()) endGame();
+    if (S.mode === "level") checkLevel();
+    else if (!movesAvailable()) endGame();
     render(); save();
 
     if (gained){
@@ -905,7 +993,8 @@
       checkMedal(biggest);
     } else sfx.move();
 
-    if (S.over) { sfx.lose(); buzz([0,40,60,40]); }
+    if (S.mode === "level"){ /* finishLevel already played its cue */ }
+    else if (S.over) { sfx.lose(); buzz([0,40,60,40]); }
     else if (S.won && !wonDismissed) sfx.win();
     return true;
   }
@@ -929,12 +1018,68 @@
   }
 
   function undo(){
-    if (!S.history.length || S.mode === "noundo") return;
+    if (!S.history.length || noUndoActive() || S.levelResult) return;
     resetNodes();
     restore(S.history.pop());
     S.ended = false;
     hideOverlay(); render(); save(); sfx.tap();
     if (S.mode === "timed" && !timer) startTimer();
+  }
+
+  // --- campaign -------------------------------------------------------------
+  const levelGoal = lvl => lvl.tile ? lvl.tile : lvl.score;
+  const levelBudget = lvl => lvl.seconds ? lvl.seconds : lvl.moves;
+
+  function levelGoalMet(){
+    const lvl = currentLevel();
+    if (!lvl) return false;
+    return lvl.tile ? maxTile() >= lvl.tile : S.score >= lvl.score;
+  }
+
+  /** How much of the budget is still in hand, 0..1. */
+  function levelLeft(){
+    const lvl = currentLevel();
+    if (!lvl) return 0;
+    const left = lvl.seconds ? S.timeLeft : lvl.moves - S.moves;
+    return Math.max(0, Math.min(1, left / levelBudget(lvl)));
+  }
+  const levelStarsEarned = () => { const l = levelLeft(); return l >= .5 ? 3 : (l >= .25 ? 2 : 1); };
+
+  function startLevel(id){
+    const lvl = levelById(id);
+    if (!lvl) return;
+    stopTimer();
+    S.mode = "level"; S.level = id;
+    newGame(lvl.size, "level");
+    S.timeLeft = lvl.seconds || TIMED_SECONDS;
+    paintPanels(); save();
+    if (lvl.seconds) startTimer();
+  }
+
+  function finishLevel(won){
+    const lvl = currentLevel();
+    if (!lvl || S.levelResult) return;
+    S.levelResult = won ? "win" : "fail";
+    S.over = true; S.ended = true;
+    stopTimer();
+    if (won){
+      const stars = levelStarsEarned();
+      if (stars > (levelStars[lvl.id] || 0)){ levelStars[lvl.id] = stars; saveLevels(); }
+      sfx.win(); buzz([0, 30, 40, 30, 40, 60]);
+    } else {
+      sfx.lose(); buzz([0, 40, 60, 40]);
+    }
+    stats.games++; stats.totalScore += S.score; saveStats();
+    save(); render();
+  }
+
+  /** Called after every move in level mode: goal first, then the budget. */
+  function checkLevel(){
+    const lvl = currentLevel();
+    if (!lvl || S.levelResult) return;
+    if (levelGoalMet()){ finishLevel(true); return; }
+    const outOfMoves = lvl.moves && S.moves >= lvl.moves;
+    if (outOfMoves || !movesAvailable()) finishLevel(false);
   }
 
   /** Records the finished game once: stats, leaderboard and the daily result. */
@@ -973,6 +1118,7 @@
       if (S.timeLeft <= 0){
         S.timeLeft = 0;
         paintPanels();
+        if (S.mode === "level"){ finishLevel(false); return; }
         endGame(); render(); sfx.lose(); buzz([0,40,60,40]);
         return;
       }
@@ -1057,13 +1203,17 @@
 
     paintPanels();
     announce();
-    $("undo").disabled = S.mode === "noundo" || S.history.length === 0;
+    $("undo").disabled = noUndoActive() || S.history.length === 0 || !!S.levelResult;
 
-    if (S.over) showOverlay(false);
+    if (S.mode === "level"){
+      if (S.levelResult) showLevelOverlay();
+      else hideOverlay();
+    }
+    else if (S.over) showOverlay(false);
     else if (S.won && !wonDismissed) showOverlay(true);
   }
 
-  const MODE_NAMES = {classic:"CLASSIC", timed:"TIMED", noundo:"NO UNDO", daily:"DAILY"};
+  const MODE_NAMES = {classic:"CLASSIC", timed:"TIMED", noundo:"NO UNDO", daily:"DAILY", level:"LEVEL"};
 
   /** Screen readers get the numbers the board shows visually. */
   let announceTimer = null;
@@ -1079,6 +1229,27 @@
 
   function paintPanels(){
     $("score").textContent = S.score;
+    const lvl = currentLevel();
+
+    if (lvl){
+      if (lvl.seconds){
+        $("bestLabel").textContent = "TIME";
+        $("best").textContent = clock(S.timeLeft);
+      } else {
+        $("bestLabel").textContent = "MOVES LEFT";
+        $("best").textContent = Math.max(0, lvl.moves - S.moves);
+      }
+      $("modeChip").textContent = "LEVEL " + lvl.id + " · " + lvl.size + "×" + lvl.size +
+                                 (lvl.noUndo ? " · NO UNDO" : "");
+      const now = lvl.tile ? maxTile() : S.score, goal = levelGoal(lvl);
+      $("progressText").textContent = (lvl.tile ? "TILE " : "SCORE ") + now + " / " + goal;
+      const ratio = lvl.tile
+        ? Math.log2(Math.max(now, 2)) / Math.log2(goal)
+        : now / goal;
+      $("progressBar").style.width = Math.min(100, Math.max(0, ratio * 100)) + "%";
+      return;
+    }
+
     if (S.mode === "timed"){
       $("bestLabel").textContent = "TIME";
       $("best").textContent = clock(S.timeLeft);
@@ -1148,8 +1319,31 @@
   }
 
   // --- overlay --------------------------------------------------------------
+  function showLevelOverlay(){
+    const lvl = currentLevel(), won = S.levelResult === "win";
+    const stars = won ? levelStarsEarned() : 0;
+    $("overlayMsg").textContent = won ? "LEVEL " + lvl.id + " CLEAR" : "LEVEL FAILED";
+    $("overlayStars").style.display = "";
+    $("overlayStars").innerHTML = [1,2,3].map(i =>
+      `<i class="${i <= stars ? "on" : ""}">★</i>`).join("");
+    const goalText = (lvl.tile ? "REACH " + lvl.tile : "SCORE " + lvl.score);
+    $("overlaySub").innerHTML = won
+      ? goalText + " · " + (lvl.seconds ? clock(S.timeLeft) + " LEFT" : (lvl.moves - S.moves) + " MOVES LEFT")
+      : "GOAL: " + goalText + "<br>YOU GOT " + (lvl.tile ? maxTile() : S.score);
+    const next = won && levelById(lvl.id + 1);
+    $("nextLevel").style.display = next ? "" : "none";
+    $("keepGoing").style.display = "none";
+    $("shareBtn").style.display = "none";
+    $("tryAgain").textContent = won ? "REPLAY" : "RETRY";
+    $("overlay").classList.add("show");
+  }
+
   function showOverlay(isWin){
     const tile = maxTile();
+    $("overlayStars").style.display = "none";
+    $("nextLevel").style.display = "none";
+    $("shareBtn").style.display = "";
+    $("tryAgain").textContent = "NEW GAME";
     $("overlayMsg").textContent = isWin ? "YOU WIN!" : (S.mode === "timed" && S.timeLeft <= 0 ? "TIME UP" : "GAME OVER");
     $("overlaySub").innerHTML = isWin
       ? "YOU REACHED 2048"
@@ -1308,7 +1502,7 @@
   function paintMenuNote(){
     const daily = store.json(DAILY, null);
     const current = slotInProgress(bestKey());
-    const parts = [MODE_NAMES[S.mode] + " " + S.size + "×" + S.size];
+    const parts = [S.mode === "level" ? "LEVEL " + S.level : MODE_NAMES[S.mode] + " " + S.size + "×" + S.size];
     if (current) parts.push("IN PROGRESS " + (current.score || 0));
     else if (getBest()) parts.push("BEST " + getBest());
     if (daily && daily.day === todayKey()) parts.push("TODAY " + daily.score);
@@ -1352,6 +1546,36 @@
                   <span class="meta-s">${MODE_NAMES[e.mode] || e.mode} ${e.size}×${e.size} · ${e.tile} · ${d}</span></div>`;
         }).join("")
       : `<p class="empty">No games finished yet.</p>`;
+  }
+
+  // --- levels sheet ---------------------------------------------------------
+  function paintLevels(){
+    const total = LEVELS.length * 3;
+    const earned = LEVELS.reduce((sum, l) => sum + (levelStars[l.id] || 0), 0);
+    const next = nextLevelId();
+    $("levelsNote").textContent = "★ " + earned + " / " + total +
+      (next ? "  ·  NEXT: LEVEL " + next : "  ·  ALL CLEAR");
+
+    $("levelGrid").innerHTML = LEVELS.map(l => {
+      const stars = levelStars[l.id] || 0;
+      const open = levelUnlocked(l.id);
+      const cls = ["lv", open ? "" : "locked", stars ? "done" : "", l.id === next ? "current" : ""].join(" ");
+      const label = l.tile ? l.tile : l.score;
+      return `<button type="button" class="${cls}" data-level="${l.id}" ${open ? "" : "disabled"}
+               aria-label="Level ${l.id}, ${stars} of 3 stars">
+                <span>${l.id}</span>
+                <small>${open ? (l.tile ? label : "⌁" + label) : "🔒"}</small>
+                <small>${open ? "★".repeat(stars) + "☆".repeat(3 - stars) : ""}</small>
+              </button>`;
+    }).join("");
+
+    $("levelGrid").querySelectorAll(".lv").forEach(b =>
+      b.addEventListener("click", () => {
+        closeSheet("levelsSheet");
+        startLevel(+b.dataset.level);
+        showScreen("game");
+        if (!prefs.tutorialDone) showTutorial();
+      }));
   }
 
   // --- modes sheet ----------------------------------------------------------
@@ -1428,6 +1652,14 @@
     if (!prefs.tutorialDone) showTutorial();
     if (S.mode === "timed" && !S.over) startTimer();
   });
+  $("openLevels").addEventListener("click", () => { paintLevels(); openSheet("levelsSheet"); });
+  $("closeLevels").addEventListener("click", () => closeSheet("levelsSheet"));
+  $("nextLevel").addEventListener("click", () => {
+    sfx.tap();
+    const next = levelById(S.level + 1);
+    if (next) startLevel(next.id);
+  });
+
   $("openModes").addEventListener("click", () => {
     pickSize = prefs.size; pickMode = prefs.mode; paintModes(); openSheet("modesSheet");
   });
@@ -1459,8 +1691,9 @@
   $("closeStats").addEventListener("click", () => closeSheet("statsSheet"));
   $("likeBtn").addEventListener("click", () => { sfx.tap(); toast("Thanks for playing!"); });
 
-  $("restart").addEventListener("click", () => { sfx.tap(); newGame(); });
-  $("tryAgain").addEventListener("click", () => { sfx.tap(); newGame(); });
+  const restartCurrent = () => { sfx.tap(); if (S.mode === "level") startLevel(S.level); else newGame(); };
+  $("restart").addEventListener("click", restartCurrent);
+  $("tryAgain").addEventListener("click", restartCurrent);
   $("toMenu").addEventListener("click", () => { sfx.tap(); showScreen("menu"); });
   $("undo").addEventListener("click", undo);
   $("hint").addEventListener("click", showHint);
@@ -1500,6 +1733,7 @@
   $("resetAll").addEventListener("click", () => {
     bestMap = {}; stats = {games:0, moves:0, bestTile:0, totalScore:0, medals:[]}; top = [];
     games = {}; saveGames(); store.del(LAST);
+    levelStars = {}; saveLevels();
     saveBest(); saveStats(); saveTop(); store.del(DAILY);
     newGame(S.size, S.mode);
     render(); paintStats(); paintMenuNote(); sfx.tap(); toast("Scores and stats cleared");
