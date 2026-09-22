@@ -563,7 +563,7 @@
     <div class="opt"><span>Sound</span><button class="switch" id="swSound" role="switch" aria-checked="true"></button></div>
     <div class="opt"><span>Vibration</span><button class="switch" id="swVibe" role="switch" aria-checked="true"></button></div>
     <div class="opt"><span>Animations</span><button class="switch" id="swAnim" role="switch" aria-checked="true"></button></div>
-    <div class="opt"><span>Ambient sound</span><button class="switch" id="swAmbient" role="switch" aria-checked="true"></button></div>
+    <div class="opt"><span>Music</span><button class="switch" id="swAmbient" role="switch" aria-checked="true"></button></div>
     <div class="opt"><span>High contrast</span><button class="switch" id="swContrast" role="switch" aria-checked="false"></button></div>
     <div class="opt"><span>Tutorial</span>
       <button class="chip" id="replayTutorial" type="button" style="flex:0 0 auto">SHOW</button></div>
@@ -879,57 +879,148 @@
     buzz(Math.round(Math.min(6 + steps * 5, 46)));
   }
 
-  /**
-   * A quiet ambient pad, generated rather than shipped: three detuned voices through a
-   * low-pass filter, breathing on a slow LFO. Browsers only allow it after a gesture.
+  /* --- music ---------------------------------------------------------------
+   * Generated rather than shipped: a slow music-box melody over a breathing pad,
+   * so the download stays a few kilobytes and there is no licence to carry.
+   * createMusic is self-contained on purpose — the test suite extracts it and
+   * renders it through an OfflineAudioContext to check the mix.
    */
+  function createMusic(ctx, destination){
+    // D major pentatonic over three octaves: a random walk here can never land on a clash
+    const SCALE = [146.83, 164.81, 185.00, 220.00, 246.94,
+                   293.66, 329.63, 369.99, 440.00, 493.88,
+                   587.33, 659.25, 739.99];
+    const CHORDS = [[73.42, 110.00, 185.00],    // D
+                    [98.00, 123.47, 185.00],    // G
+                    [82.41, 123.47, 164.81],    // Em
+                    [73.42, 110.00, 164.81]];   // Dsus
+    const BEAT = 1.15, BAR = BEAT * 8, LEVEL = 0.55;
+
+    const master = ctx.createGain();
+    master.gain.value = 0.0001;
+
+    // a gentle lowpass keeps the bells from sounding glassy on a phone speaker
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass"; tone.frequency.value = 2600; tone.Q.value = 0.3;
+
+    // a long delay with soft feedback stands in for a reverb tail
+    const delay = ctx.createDelay(2);
+    delay.delayTime.value = 0.42;
+    const feedback = ctx.createGain(); feedback.gain.value = 0.3;
+    const damp = ctx.createBiquadFilter(); damp.type = "lowpass"; damp.frequency.value = 1400;
+    const wet = ctx.createGain(); wet.gain.value = 0.36;
+
+    tone.connect(master);
+    tone.connect(delay);
+    delay.connect(damp); damp.connect(feedback); feedback.connect(delay);
+    damp.connect(wet); wet.connect(master);
+    master.connect(destination);
+
+    /** One note: a sine with a quiet octave and twelfth above, struck softly and left to ring. */
+    function bell(freq, at, level){
+      const amp = ctx.createGain();
+      amp.gain.setValueAtTime(0.0001, at);
+      amp.gain.exponentialRampToValueAtTime(level, at + 0.04);
+      amp.gain.exponentialRampToValueAtTime(0.0001, at + 3.2);
+      amp.connect(tone);
+      [[1, 1], [2, 0.16], [2.97, 0.05]].forEach(partial => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * partial[0];
+        const gain = ctx.createGain();
+        gain.gain.value = partial[1];
+        osc.connect(gain).connect(amp);
+        osc.start(at); osc.stop(at + 3.4);
+      });
+    }
+
+    /** The chord underneath: three triangles swelling in and back out across a bar. */
+    function pad(chord, at, length){
+      const amp = ctx.createGain();
+      amp.gain.setValueAtTime(0.0001, at);
+      amp.gain.exponentialRampToValueAtTime(0.14, at + length * 0.45);
+      amp.gain.exponentialRampToValueAtTime(0.0001, at + length);
+      const soften = ctx.createBiquadFilter();
+      soften.type = "lowpass"; soften.frequency.value = 700;
+      amp.connect(soften).connect(master);
+      chord.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        osc.detune.value = (i - 1) * 4;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.28;
+        osc.connect(gain).connect(amp);
+        osc.start(at); osc.stop(at + length + 0.3);
+      });
+    }
+
+    let step = 0, chordIndex = 0, note = 5, nextBar = 0, timer = null;
+
+    function scheduleBar(at){
+      pad(CHORDS[chordIndex++ % CHORDS.length], at, BAR + 1.4);
+      for (let beat = 0; beat < 8; beat++){
+        step++;
+        if (step % 4 === 3) continue;                 // leave a gap to breathe
+        if (Math.random() < 0.22) continue;           // and skip the odd beat
+        note = Math.max(0, Math.min(SCALE.length - 1, note + Math.floor(Math.random() * 5) - 2));
+        bell(SCALE[note], at + beat * BEAT + (Math.random() - 0.5) * 0.04, 0.12 + Math.random() * 0.06);
+      }
+    }
+
+    /** Keep roughly two bars queued ahead, so a throttled timer cannot break the phrasing. */
+    function pump(){
+      const horizon = ctx.currentTime + BAR * 2;
+      if (nextBar < ctx.currentTime + 0.2) nextBar = ctx.currentTime + 0.2;
+      while (nextBar < horizon){
+        scheduleBar(nextBar);
+        nextBar += BAR;
+      }
+      timer = setTimeout(pump, BAR * 500);
+    }
+
+    return {
+      start(){
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setValueAtTime(0.0001, ctx.currentTime);
+        master.gain.exponentialRampToValueAtTime(LEVEL, ctx.currentTime + 4);   // ease it in
+        pump();
+      },
+      stop(){
+        clearTimeout(timer);
+        const now = ctx.currentTime;
+        master.gain.cancelScheduledValues(now);
+        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), now);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+        setTimeout(() => { try { master.disconnect(); } catch(e){} }, 1600);
+      },
+      /** Used by the offline preview: lay down the whole piece up front. */
+      prime(duration){
+        master.gain.setValueAtTime(0.0001, 0);
+        master.gain.exponentialRampToValueAtTime(LEVEL, 4);
+        for (let at = 0.2; at < duration; at += BAR) scheduleBar(at);
+      }
+    };
+  }
+  /* --- end music --- */
+
   const ambient = {
-    nodes:null,
+    music: null,
     start(){
-      if (!prefs.ambient || this.nodes) return;
+      if (!prefs.ambient || this.music) return;
       try {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         if (!Ctx) return;
         audio = audio || new Ctx();
         if (audio.state === "suspended") audio.resume();
-        const master = audio.createGain();
-        master.gain.value = 0;
-        const filter = audio.createBiquadFilter();
-        filter.type = "lowpass"; filter.frequency.value = 520; filter.Q.value = .6;
-        filter.connect(master).connect(audio.destination);
-
-        const voices = [110, 164.81, 220].map((freq, i) => {
-          const osc = audio.createOscillator();
-          osc.type = i === 2 ? "sine" : "triangle";
-          osc.frequency.value = freq;
-          osc.detune.value = (i - 1) * 6;
-          const gain = audio.createGain();
-          gain.gain.value = i === 2 ? .18 : .32;
-          osc.connect(gain).connect(filter);
-          osc.start();
-          return osc;
-        });
-
-        const lfo = audio.createOscillator(), lfoGain = audio.createGain();
-        lfo.frequency.value = 0.05; lfoGain.gain.value = .012;
-        lfo.connect(lfoGain).connect(master.gain);
-        lfo.start();
-
-        master.gain.setValueAtTime(0, audio.currentTime);
-        master.gain.linearRampToValueAtTime(.03, audio.currentTime + 4);   // fade in slowly
-        this.nodes = {master, voices, lfo};
+        this.music = createMusic(audio, audio.destination);
+        this.music.start();
       } catch(e){}
     },
     stop(){
-      if (!this.nodes) return;
-      const {master, voices, lfo} = this.nodes;
-      this.nodes = null;
-      try {
-        master.gain.cancelScheduledValues(audio.currentTime);
-        master.gain.setValueAtTime(master.gain.value, audio.currentTime);
-        master.gain.linearRampToValueAtTime(0, audio.currentTime + .6);
-        setTimeout(() => { voices.forEach(v => { try { v.stop(); } catch(e){} }); try { lfo.stop(); } catch(e){} }, 800);
-      } catch(e){}
+      const music = this.music;
+      this.music = null;
+      if (music) { try { music.stop(); } catch(e){} }
     }
   };
 
